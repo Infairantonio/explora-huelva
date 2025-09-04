@@ -1,19 +1,75 @@
 :root {
-  --color-fondo: #f8f9fa;
-}
-
-html, body, #root {
-  height: 100%;
+  --azul-oscuro: #003366;
+  --azul-medio: #0066cc;
+  --azul-claro: #e6f0fa;
+  --blanco: #ffffff;
+  --gris-suave: #f8f9fa;
 }
 
 body {
-  background: var(--color-fondo);
+  background-color: var(--gris-suave);
+  font-family: 'Nunito', sans-serif;
+  padding-top: 50px; /* ajusta según la altura del navbar */
+
 }
 
-.pre-json {
-  background: #f1f3f5;
-  padding: 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-  border: 1px solid #e9ecef;
+
+.navbar {
+  background: linear-gradient(90deg, var(--azul-oscuro), var(--azul-medio));
 }
+
+.navbar .nav-link {
+  color: var(--blanco) !important;
+  transition: color 0.3s;
+}
+
+.navbar .nav-link:hover {
+  color: var(--azul-claro) !important;
+}
+
+.btn-primary {
+  background-color: var(--azul-medio);
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: var(--azul-oscuro);
+}
+
+/* HERO */
+.hero {
+  min-height: 70vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem 1rem;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  text-shadow: 0 3px 6px rgba(0,0,0,0.5);
+}
+
+.hero p {
+  font-size: 1.25rem;
+  max-width: 700px;
+  margin: 0 auto;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.hero .btn {
+  font-size: 1.1rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+}
+
+
+footer {
+  background-color: var(--azul-oscuro);
+  color: var(--blanco);
+}
+
+
