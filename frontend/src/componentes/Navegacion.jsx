@@ -39,9 +39,10 @@ export default function Navegacion() {
           </ul>
 
           {/* Botón de login */}
-          <a href="#" className="btn btn-primary ms-lg-3">
+          <a href="/login" className="btn btn-primary ms-lg-3">
   <i className="bi bi-person-circle me-1"></i> Entrar
 </a>
+
 
         </div>
       </div>
