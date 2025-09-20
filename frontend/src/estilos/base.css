@@ -1,75 +1,182 @@
+/* ===========================
+   Variables de diseño (tema)
+   =========================== */
 :root {
   --azul-oscuro: #003366;
-  --azul-medio: #0066cc;
-  --azul-claro: #e6f0fa;
-  --blanco: #ffffff;
-  --gris-suave: #f8f9fa;
+  --azul-medio:  #0667d0;
+  --azul-claro:  #e6f0fa;
+  --blanco:      #ffffff;
+  --gris-suave:  #f8f9fa;
+
+  /* Alturas de navbar y footer para cálculos de layout (login, etc.) */
+  --navbar-h: 56px;
+  --footer-h: 64px;
 }
 
+/* Aseguramos que html y body ocupen el alto completo de la ventana */
+html, body {
+  height: 100%;
+}
+
+/* Fondo general, tipografía y compensación por navbar fixed-top */
 body {
   background-color: var(--gris-suave);
   font-family: 'Nunito', sans-serif;
-  padding-top: 50px; /* ajusta según la altura del navbar */
-
+  padding-top: var(--navbar-h); /* evita que el contenido quede debajo del navbar */
+  margin: 0;
 }
 
+/* =========
+   NAVBAR
+   ========= */
 
+/* Degradado de marca en el navbar */
 .navbar {
   background: linear-gradient(90deg, var(--azul-oscuro), var(--azul-medio));
 }
 
+/* Enlaces del navbar en blanco, con transición suave al hover */
 .navbar .nav-link {
   color: var(--blanco) !important;
-  transition: color 0.3s;
+  transition: color 0.2s ease;
 }
-
 .navbar .nav-link:hover {
   color: var(--azul-claro) !important;
 }
 
+/* =========
+   BOTONES
+   ========= */
+
+/* Botón primario con los colores de marca */
 .btn-primary {
   background-color: var(--azul-medio);
   border: none;
 }
-
 .btn-primary:hover {
   background-color: var(--azul-oscuro);
 }
 
-/* HERO */
+/* ==================
+   HERO (portada)
+   ================== */
+
+/* Sección “hero” con imagen de fondo y texto centrado */
 .hero {
-  min-height: 70vh;
+  min-height: 60vh;                 /* altura mínima para impacto visual */
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 3rem 1rem;
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: cover;           /* cubre toda la sección */
   background-position: center;
 }
-
 .hero h1 {
   font-size: 3rem;
-  text-shadow: 0 3px 6px rgba(0,0,0,0.5);
+  text-shadow: 0 3px 6px rgba(0,0,0,0.5);  /* mejora legibilidad sobre imágenes */
 }
-
 .hero p {
-  font-size: 1.25rem;
-  max-width: 700px;
+  font-size: 1.2rem;
+  max-width: 700px;                 /* limita el ancho del párrafo */
   margin: 0 auto;
   text-shadow: 0 2px 4px rgba(0,0,0,0.4);
 }
-
 .hero .btn {
-  font-size: 1.1rem;
-  padding: 0.75rem 1.5rem;
+  font-size: 1.05rem;
+  padding: 0.7rem 1.35rem;
   border-radius: 8px;
 }
 
+/* =========
+   FOOTER
+   ========= */
 
+/* Fondo oscuro y texto blanco para el pie de página */
 footer {
   background-color: var(--azul-oscuro);
   color: var(--blanco);
+  min-height: var(--footer-h);
 }
 
+/* Forzamos blanco incluso si hay utilidades .text-muted de Bootstrap dentro */
+footer .text-muted {
+  color: var(--blanco) !important;
+}
 
+/* Enlaces del footer también en blanco (con leve efecto al pasar el ratón) */
+footer a {
+  color: var(--blanco) !important;
+}
+footer a:hover {
+  opacity: 0.9;
+}
+
+/* ================================
+   LOGIN (estilo tipo “Facebook”)
+   ================================ */
+
+/* Wrapper central del login:
+   ocupa exactamente el alto visible menos navbar y footer.
+   Así el footer queda SIEMPRE visible sin hacer scroll. */
+.auth-wrap {
+  min-height: calc(100vh - var(--navbar-h) - var(--footer-h));
+  display: flex;
+  align-items: center; /* centra verticalmente el contenido del login */
+  background: linear-gradient(180deg, #edf3fb 0%, #ffffff 100%);
+  padding: 1.5rem 0;
+}
+
+/* Grid base del login: 1 columna por defecto (móvil) */
+.auth-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+/* Columna de copia/branding a la izquierda en desktop */
+.auth-copy h2 {
+  font-weight: 800;
+  color: var(--azul-medio);
+  margin-bottom: 0.5rem;
+}
+.auth-copy p {
+  font-size: 1.05rem;
+  color: #325;   /* tono ligeramente más suave */
+  margin: 0;
+}
+
+/* Tarjeta del formulario de acceso:
+   más estrecha y con bordes redondeados */
+.auth-card {
+  border-radius: 16px;
+  max-width: 420px;  /* ancho típico del login de Facebook */
+  width: 100%;
+}
+.auth-card .card-body {
+  padding: 1.25rem 1.25rem;
+}
+.auth-card .form-control {
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+}
+
+/* En pantallas >= 992px (lg) mostramos dos columnas:
+   - copy (izda) + tarjeta (dcha) */
+@media (min-width: 992px) {
+  .auth-layout {
+    grid-template-columns: 1.1fr 0.9fr; /* ligera prioridad a la copy */
+  }
+  .auth-copy h2 {
+    font-size: 2.2rem;
+  }
+}
+
+/* En pantallas muy grandes, ajustamos tamaño del título del formulario */
+@media (min-width: 1400px) {
+  .auth-card .card-title {
+    font-size: 1.6rem;
+  }
+}

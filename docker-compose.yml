@@ -1,6 +1,4 @@
-﻿version: "3.9"
-
-services:
+﻿services:
   mongo:
     image: mongo:7
     container_name: mongo_explora
@@ -23,7 +21,7 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_RAIZ_USUARIO}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_RAIZ_PASSWORD}
       ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_BASICAUTH: "false"
+      ME_CONFIG_BASICAUTH: "false"     # en prod ponlo a "true"
     ports:
       - "${PUERTO_MONGO_EXPRESS}:8081"
     networks: [explora_red]
@@ -32,18 +30,29 @@ services:
     image: node:20-alpine
     container_name: api_explora
     working_dir: /app
-    depends_on: [mongo]
+    depends_on: [mongo]                # sin condition para no bloquear arranque
     environment:
       NODE_ENV: development
       PUERTO_INTERNO: 5174
       JWT_SECRETO: ${JWT_SECRETO}
       CADENA_MONGO: "mongodb://${MONGO_RAIZ_USUARIO}:${MONGO_RAIZ_PASSWORD}@mongo:27017/${MONGO_NOMBRE_BD}?authSource=admin"
-    command: sh -c "npm install && npm run dev"
+      FRONT_ORIGEN: "http://localhost:${PUERTO_WEB}"
+      UPLOAD_DIR: /app/uploads
+    # Instala deps si faltan (volumen node_modules puede existir pero estar vacío)
+    command: sh -lc "if [ ! -x node_modules/.bin/nodemon ]; then npm ci --silent || npm install --silent; fi; npm run dev"
     volumes:
       - ./backend:/app
+      - api_node_modules:/app/node_modules
+      - ./uploads:/app/uploads
     ports:
       - "${PUERTO_API}:5174"
     networks: [explora_red]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5174/api/salud"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   web:
     image: node:20-alpine
@@ -52,16 +61,21 @@ services:
     environment:
       NODE_ENV: development
       VITE_API_URL: "http://localhost:${PUERTO_API}"
-    command: sh -c "npm install && npm run dev -- --host"
+    # Instala deps si faltan (vite debe existir en node_modules/.bin)
+    command: sh -lc "if [ ! -x node_modules/.bin/vite ]; then npm ci --silent || npm install --silent; fi; npm run dev -- --host"
     volumes:
       - ./frontend:/app
+      - web_node_modules:/app/node_modules
     ports:
       - "${PUERTO_WEB}:5173"
-    depends_on: [api]
     networks: [explora_red]
+    depends_on:
+      - api                              # sin condition: no esperes al healthcheck
 
 volumes:
   datos-mongo:
+  api_node_modules:
+  web_node_modules:
 
 networks:
   explora_red:

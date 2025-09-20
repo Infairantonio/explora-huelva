@@ -1,14 +1,40 @@
 <!doctype html>
+<!-- Indica al navegador que el documento usa HTML5 -->
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Controla el zoom y el ancho en móviles para diseño responsive -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Explora Huelva</title>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 
+    <!-- Descripción corta para SEO y previews en buscadores -->
+    <meta
+      name="description"
+      content="Explora Huelva: rutas, lugares y experiencias únicas para descubrir la provincia."
+    />
+
+    <!-- Color del tema para barras de navegador en móviles -->
+    <meta name="theme-color" content="#0066cc" />
+
+    <!-- Icono de la pestaña del navegador -->
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- Optimiza la conexión a los servidores de Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Fuente Nunito (400/600/700) usada en toda la app -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
+
   <body>
+    <!-- Contenedor raíz donde React montará la SPA -->
     <div id="root"></div>
+
+    <!-- Punto de entrada de Vite/React (carga el bundle en modo módulo ES) -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
