@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import Hero from '../componentes/Hero';
 import TarjetaCard from '../componentes/TarjetaCard.jsx';
 import { tarjetasApi } from '../servicios/tarjetas';
+import banner from '../imagenes/banner.jpg';
 
 // Para el Panel de Estado (ping a /api/salud)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5174';
@@ -47,16 +48,16 @@ export default function Inicio() {
       {/* Hero superior con un fondo bonito */}
       <Hero
         titulo="Explora Huelva"
-        subtitulo="Descubre rutas, lugares y experiencias únicas 🌊🌅"
+        subtitulo="Descubre rutas, lugares y experiencias únicas"
         botonPrincipal={{ texto: 'Ver rutas', href: '#' }}
         botonSecundario={{ texto: 'Iniciar sesión', href: '/login' }}
-        fondo="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80"
+        fondo={banner}
       />
 
       {/* Bloque tarjetas públicas (portada) */}
       <div className="container my-4">
         <div className="d-flex align-items-center justify-content-between mb-3">
-          <h2 className="mb-0 text-primary fw-bold">Descubre contenido público</h2>
+          <h2 className="mb-0 text-primary fw-bold">Descubre Huelva</h2>
         </div>
 
         {/* Estados de carga / error / vacío / listado */}
@@ -73,8 +74,10 @@ export default function Inicio() {
           <div className="row g-3">
             {pub.items.map((it) => (
               <div key={it._id} className="col-12 col-sm-6 col-lg-4">
-                {/* En portada no damos acciones, así que no pasamos onEdit/onDelete */}
-                <TarjetaCard item={it} />
+                <TarjetaCard
+                  item={it}
+                  detalleHref={`/tarjetas/${it._id}`}
+                />
               </div>
             ))}
           </div>

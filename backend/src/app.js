@@ -15,9 +15,10 @@ import fs from "fs"; // Sistema de archivos (para crear /uploads si falta)
 import path from "path"; // Utilidades de rutas de archivos
 
 // Rutas de la aplicación (se importan ya configuradas como routers)
-import rutaSalud from "./rutas/salud.ruta.js"; // /api/salud (pong)
-import rutaAuth from "./rutas/auth.ruta.js"; // /api/auth (login / registro)
+import rutaSalud from "./rutas/salud.ruta.js";      // /api/salud (pong)
+import rutaAuth from "./rutas/auth.ruta.js";        // /api/auth (login / registro)
 import rutaTarjetas from "./rutas/tarjetas.ruta.js"; // /api/tarjetas (CRUD)
+import rutaComentarios from "./rutas/comentarios.ruta.js"; // /api/tarjetas/:id/comentarios, /api/comentarios/:id
 
 // Instancia de la app Express
 const app = express();
@@ -49,19 +50,22 @@ app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "1h" }));
 // Ocultar cabecera X-Powered-By por mínima seguridad (no revela que es Express)
 app.disable("x-powered-by");
 
+// Si algún día sirves detrás de Nginx/Render/etc.
+app.set("trust proxy", 1);
+
 // Logger HTTP en modo desarrollo (muestra método, ruta, estado, tiempo, etc.)
 app.use(morgan("dev"));
 
 // Configuración de CORS
 // - Permite peticiones desde los orígenes listados en ORIGENES_PERMITIDOS
-// - Sigue manteniendo credentials: false para no cambiar comportamiento actual
+// - Rechaza otros orígenes sin lanzar error (menos ruido en logs)
 app.use(
   cors({
     origin: (origin, callback) => {
       // Permite herramientas locales (Postman/cURL) sin origin
       if (!origin) return callback(null, true);
       if (ORIGENES_PERMITIDOS.includes(origin)) return callback(null, true);
-      return callback(new Error("Origen no permitido por CORS"));
+      return callback(null, false); // rechaza sin tirar error
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -87,6 +91,7 @@ app.get("/", (_req, res) => {
 app.use("/api/salud", rutaSalud);
 app.use("/api/auth", rutaAuth);
 app.use("/api/tarjetas", rutaTarjetas);
+app.use("/api", rutaComentarios); // ← rutas de comentarios (GET/POST/DELETE)
 
 // Middleware de manejo básico de errores (mejora leve):
 // Centraliza errores no capturados en rutas y devuelve JSON homogéneo
@@ -97,7 +102,7 @@ app.use((err, _req, res, _next) => {
 
 // Arranque del servidor HTTP + conexión a MongoDB
 // Nota: Se mantiene la semántica original (levantar servidor y luego conectar).
-// Si se quiere ser estrictos, podría esperarse a conectar Mongo antes de listen().
+// Si prefieres ser estricto, podrías conectar primero y luego app.listen().
 app.listen(PUERTO, () => {
   console.log(`✅ API escuchando en http://localhost:${PUERTO}`);
 

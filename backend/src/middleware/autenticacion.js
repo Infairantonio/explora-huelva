@@ -1,40 +1,36 @@
 // backend/src/middlewares/autenticacion.js
 // ————————————————————————————————————————————————
 // Middleware de autenticación por JWT.
-// Extrae el token del header Authorization: Bearer <token>,
-// verifica la firma y añade `req.usuario` con datos mínimos.
-// Incluye mejoras suaves y comentarios línea a línea.
+// Extrae "Authorization: Bearer <token>", verifica (utils/jwt) y añade req.usuario.
 // ————————————————————————————————————————————————
 
-import jwt from 'jsonwebtoken';
+import { verificar } from '../utils/jwt.js';
 
 export default function autenticacion(req, res, next) {
-  // Obtiene el header Authorization (puede venir en minúsculas según el proxy)
-  const auth = req.headers.authorization || req.headers.Authorization || '';
+  // Leer cabecera Authorization (tolerante a mayúsculas/minúsculas)
+  const rawAuth = req.headers.authorization ?? req.headers.Authorization ?? '';
+  const auth = typeof rawAuth === 'string' ? rawAuth.trim() : '';
 
-  // Acepta formato "Bearer <token>" (con o sin espacios extra)
-  const prefijo = 'Bearer ';
-  const token = auth.startsWith(prefijo) ? auth.slice(prefijo.length).trim() : null;
-
-  // (Opcional) también podríamos aceptar token vía cookie/session si lo habilitas en el futuro
-  // const token = authHeader || req.cookies?.token || null;
+  // Acepta "Bearer <token>" con prefijo case-insensitive y espacios variables
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
 
   if (!token) {
     return res.status(401).json({ ok: false, mensaje: 'Falta token' });
   }
 
   try {
-    // Verifica el token con el secreto del entorno
-    const payload = jwt.verify(token, process.env.JWT_SECRETO);
+    // verificar() ya usa el secreto del entorno y clockTolerance=5
+    const payload = verificar(token);
 
-    // Poblamos req.usuario con un subconjunto mínimo, evitando información sensible
-    req.usuario = { id: payload.uid, nombre: payload.nombre, email: payload.email };
+    req.usuario = {
+      id: payload.uid,
+      nombre: payload.nombre,
+      email: payload.email,
+    };
 
-    // Continúa al siguiente middleware/controlador
     return next();
-  } catch (e) {
-    // jwt.verify puede lanzar por firma inválida, expiración, etc.
-    // Para no filtrar detalles de seguridad, devolvemos un mensaje genérico
+  } catch {
     return res.status(401).json({ ok: false, mensaje: 'Token inválido o expirado' });
   }
 }

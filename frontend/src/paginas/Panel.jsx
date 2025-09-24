@@ -1,95 +1,110 @@
 // src/paginas/Panel.jsx
-// Panel privado del usuario donde gestiona sus tarjetas:
-// - Carga las tarjetas del usuario autenticado
+// Panel privado del usuario donde gestiona sus tarjetas
+// - Carga las tarjetas del usuario autenticado (con cancelación segura)
 // - Permite refrescar la lista
 // - Navegar a crear/editar
-// - Eliminar con borrado optimista
+// - Eliminar con borrado optimista y fallback claro
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { tarjetasApi } from '../servicios/tarjetas';
+import { logout } from '../utils/auth';
 import TarjetaCard from '../componentes/TarjetaCard.jsx';
 
 export default function Panel() {
-  // Estado: lista de tarjetas, mensaje de error y flag de carga
   const [items, setItems] = useState([]);
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(true);
 
-  // Para redirecciones (p.ej. si expira el token)
   const navigate = useNavigate();
+  const abortRef = useRef(null);
 
-  // Función que trae "mis tarjetas" desde la API
-  // useCallback evita recrearla en cada render y que el useEffect se dispare sin necesidad
   const cargar = useCallback(async () => {
     setMensaje('');
     setCargando(true);
+
+    // Cancela fetches previos si los hubiera
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      const r = await tarjetasApi.mias();
+      const r = await tarjetasApi.mias({ signal: controller.signal });
 
-      // Si el backend responde 401 (token inválido/expirado), mandamos a login
-      if (r.status === 401) {
-        navigate('/login', { replace: true });
+      // 401 → sesión inválida/expirada: limpiamos token y vamos a login
+      if (r?.status === 401) {
+        logout();
+        navigate('/login', { replace: true, state: { from: { pathname: '/panel' } } });
         return;
       }
 
-      // Cualquier otro error de API
-      if (!r.ok) {
-        setMensaje(r.mensaje || 'No se pudieron cargar tus tarjetas');
+      if (!r?.ok) {
+        setMensaje(r?.mensaje || 'No se pudieron cargar tus tarjetas');
+        setItems([]);
         return;
       }
 
-      // Guardamos la lista (normalizamos a array)
       setItems(Array.isArray(r.items) ? r.items : []);
     } catch (e) {
-      // Errores de red, parseo, etc.
-      setMensaje(e.message || 'Error de red');
+      // Ignora aborts intencionales
+      if (e?.name === 'AbortError') return;
+      setMensaje(e?.message || 'Error de red');
+      setItems([]);
     } finally {
       setCargando(false);
     }
   }, [navigate]);
 
-  // Cargamos al montar el componente (y cuando cambie "cargar")
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => {
+    cargar();
+    // Cleanup al desmontar: aborta la petición en vuelo
+    return () => abortRef.current?.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargar]);
 
-  // Eliminar con borrado optimista:
-  // 1) Quitamos de la UI inmediatamente
-  // 2) Llamamos a la API; si falla, revertimos
+  // Eliminar con borrado optimista
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar esta tarjeta?')) return;
 
-    const previo = items;                           // backup por si hay que revertir
+    const copia = items;
     setItems(prev => prev.filter(i => i._id !== id));
 
-    const r = await tarjetasApi.eliminar(id);
-    if (!r.ok) {
-      setItems(previo);                             // revertir
-      alert(r.mensaje || 'No se pudo eliminar');
+    try {
+      const r = await tarjetasApi.eliminar(id);
+      if (!r?.ok) {
+        setItems(copia); // revertir
+        alert(r?.mensaje || 'No se pudo eliminar');
+      }
+    } catch (e) {
+      setItems(copia); // revertir
+      alert(e?.message || 'Error de red al eliminar');
     }
   };
 
   return (
     <div className="container py-4">
-      {/* Cabecera con título, recargar y crear nueva */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h1 className="h4 mb-0">Mis tarjetas</h1>
+      {/* Cabecera */}
+      <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <h1 className="h4 mb-2 mb-sm-0">
+          Mis tarjetas {items?.length ? <small className="text-muted">({items.length})</small> : null}
+        </h1>
         <div className="d-flex gap-2">
           <button className="btn btn-outline-secondary" onClick={cargar} disabled={cargando}>
-            <i className="bi bi-arrow-clockwise me-1" /> Recargar
+            <i className="bi bi-arrow-clockwise me-1" /> {cargando ? 'Cargando…' : 'Recargar'}
           </button>
-          <Link to="/panel/nuevo" className="btn btn-primary">
+          <Link to="/panel/nuevo" className={`btn btn-primary ${cargando ? 'disabled' : ''}`} aria-disabled={cargando}>
             <i className="bi bi-plus-lg me-1" /> Nueva
           </Link>
         </div>
       </div>
 
-      {/* Mensaje de error general, si existe */}
+      {/* Mensaje de error */}
       {mensaje && <div className="alert alert-danger">{mensaje}</div>}
 
-      {/* Estados de la lista: cargando / vacía / con datos */}
+      {/* Lista / estados */}
       {cargando ? (
-        <div className="d-flex align-items-center gap-2">
-          <div className="spinner-border" role="status" />
+        <div className="d-flex align-items-center gap-2" aria-live="polite" aria-busy="true">
+          <div className="spinner-border" role="status" aria-label="Cargando" />
           <span>Cargando…</span>
         </div>
       ) : items.length === 0 ? (
@@ -102,6 +117,7 @@ export default function Panel() {
             <div key={it._id} className="col-12 col-sm-6 col-lg-4">
               <TarjetaCard
                 item={it}
+                detalleHref={`/tarjetas/${it._id}`}
                 onEdit={() => navigate(`/panel/editar/${it._id}`)}
                 onDelete={() => eliminar(it._id)}
               />

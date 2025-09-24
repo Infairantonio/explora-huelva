@@ -1,31 +1,29 @@
 // backend/src/controladores/tarjetas.controlador.js
 // ————————————————————————————————————————————————————————
 // Controlador de "Tarjetas" (lugares/experiencias/rutas) con CRUD,
-// subida de media y listados paginados. Comentado y con mejoras ligeras
-// que no rompen el contrato actual de respuestas.
+// subida de media y listados paginados.
+// Incluye detalle público: publicaUna (GET /api/tarjetas/publicas/:id)
 // ————————————————————————————————————————————————————————
 
-import { validationResult } from 'express-validator'; // recoge errores de validación (si usas middlewares)
-import mongoose from 'mongoose'; // para validar ObjectId y consultas
-import Tarjeta from '../modelos/tarjeta.modelo.js'; // modelo Mongoose
+import { validationResult } from 'express-validator';
+import mongoose from 'mongoose';
+import Tarjeta from '../modelos/tarjeta.modelo.js';
 
 // ---------- helpers ----------
-// Atajo para validar IDs de Mongo
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// Etiquetas permitidas (recorta la taxonomía a un set controlado)
+// Única fuente local para filtrar entrada (en modelo también existe)
 const ETIQUETAS_PERMITIDAS = ['lugares', 'experiencias', 'rutas'];
 
-// utilidades funcionales pequeñas
 const uniq = (arr) => [...new Set(arr)];
 const toArray = (v) => (Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]));
 
-// Normaliza visibilidad a dos valores canónicos
+// Normaliza string "publico|privado"
 function normalizarVisibilidad(v) {
   return v === 'publico' ? 'publico' : 'privado';
 }
 
-// Normaliza y filtra etiquetas a la lista permitida
+// Filtra a etiquetas permitidas
 function normalizarEtiquetas(v) {
   const lista = toArray(v)
     .map((x) => String(x).trim().toLowerCase())
@@ -34,16 +32,23 @@ function normalizarEtiquetas(v) {
   return uniq(lista);
 }
 
+// Números opcionales (''/undefined/null -> null; inválidos -> null)
+function parseNum(v) {
+  if (v === '' || v === undefined || v === null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 // Construye la URL pública base para /uploads
 function baseUploads(req) {
   const envBase = process.env.PUBLIC_UPLOAD_URL;
-  if (envBase) return envBase.replace(/\/+$/, ''); // recorta barras finales
+  if (envBase) return envBase.replace(/\/+$/, '');
   const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const host = req.get('host'); // p.ej. localhost:5174
+  const host = req.get('host');
   return `${proto}://${host}/uploads`;
 }
 
-// A partir de req.files (multer.fields), genera URLs públicas de imágenes y video
+// A partir de req.files (multer.fields), genera URLs públicas
 function extraerMediaDesdeFiles(req) {
   const base = baseUploads(req);
   const imagenesSubidas = (req.files?.imagenes || []).map((f) => `${base}/${f.filename}`);
@@ -52,33 +57,40 @@ function extraerMediaDesdeFiles(req) {
   return { imagenesSubidas, videoUrlSubido };
 }
 
-// Normaliza imágenes combinando subidas y (por compatibilidad) URLs en body
+// Normaliza imágenes combinando subidas y URLs del body (incluye legado imagenUrl)
 function normalizarImagenes({ imagenesFiles, imagenesBody, imagenUrlBody }) {
   const lista = [
     ...toArray(imagenesFiles).map((x) => String(x).trim()).filter(Boolean),
     ...toArray(imagenesBody).map((x) => String(x).trim()).filter(Boolean),
-    ...toArray(imagenUrlBody).map((x) => String(x).trim()).filter(Boolean), // legado
+    ...toArray(imagenUrlBody).map((x) => String(x).trim()).filter(Boolean),
   ];
-  return uniq(lista).slice(0, 10); // límite de seguridad (máx. 10 URLs)
+  return uniq(lista).slice(0, 10);
 }
 
-// Pequeña utilidad para paginación segura
+// Paginación segura
 const parsePage = (v, def = 1) => Math.max(parseInt(String(v || def), 10) || def, 1);
 const parseLimit = (v, def = 12, min = 1, max = 50) => {
   const n = parseInt(String(v || def), 10) || def;
   return Math.min(Math.max(n, min), max);
 };
 
+// Formatea ValidationError de Mongoose → array de { campo, mensaje }
+function mapValidationError(err) {
+  return Object.values(err?.errors || {}).map((e) => ({
+    campo: e.path,
+    mensaje: e.message,
+  }));
+}
+
 // ---------- Crear ----------
 export async function crear(req, res) {
   try {
-    // Si has registrado validaciones con express-validator, recoge errores
+    // Red de seguridad: por si cambian middlewares en la ruta
     const errores = validationResult(req);
     if (!errores.isEmpty()) {
-      return res.status(400).json({ ok: false, errores: errores.array() });
+      return res.status(422).json({ ok: false, errores: errores.array() });
     }
 
-    // Extrae campos con defaults suaves
     const {
       titulo,
       descripcion = '',
@@ -87,14 +99,19 @@ export async function crear(req, res) {
       videoUrl = '',
       visibilidad = 'privado',
       etiquetas = [],
+      lat: latRaw,
+      lng: lngRaw,
     } = req.body || {};
 
-    // Extrae media recién subida por multer
     const { imagenesSubidas, videoUrlSubido } = extraerMediaDesdeFiles(req);
 
-    // Crea documento normalizando campos
+    // Lat/Lng: opcionales; si vienen ambos, se guardan; si no, se omiten.
+    const lat = parseNum(latRaw);
+    const lng = parseNum(lngRaw);
+    const incluirUbicacion = lat != null && lng != null;
+
     const doc = await Tarjeta.create({
-      usuario: req.usuario.id, // asume middleware auth que pobló req.usuario
+      usuario: req.usuario.id,
       titulo: String(titulo ?? '').trim(),
       descripcion: String(descripcion ?? '').trim(),
       imagenes: normalizarImagenes({
@@ -105,13 +122,15 @@ export async function crear(req, res) {
       videoUrl: String(videoUrlSubido || videoUrl || '').trim(),
       visibilidad: normalizarVisibilidad(visibilidad),
       etiquetas: normalizarEtiquetas(etiquetas),
+      ...(incluirUbicacion ? { lat, lng } : {}),
     });
 
     return res.status(201).json({ ok: true, tarjeta: doc });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ ok: false, mensaje: 'Error creando tarjeta', error: e.message });
+    if (e?.name === 'ValidationError') {
+      return res.status(422).json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
+    }
+    return res.status(500).json({ ok: false, mensaje: 'Error creando tarjeta', error: e.message });
   }
 }
 
@@ -137,9 +156,7 @@ export async function mias(req, res) {
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ ok: false, mensaje: 'Error listando tarjetas', error: e.message });
+    return res.status(500).json({ ok: false, mensaje: 'Error listando tarjetas', error: e.message });
   }
 }
 
@@ -150,11 +167,8 @@ export async function publicas(req, res) {
     const limit = parseLimit(req.query.limit, 12, 1, 50);
 
     const filtro = { visibilidad: 'publico' };
-
-    // Búsqueda de texto si existe índice de texto en el modelo
     if (req.query.q) filtro.$text = { $search: String(req.query.q) };
 
-    // Filtro por etiqueta validada
     if (req.query.etiqueta) {
       const et = String(req.query.etiqueta).trim().toLowerCase();
       if (ETIQUETAS_PERMITIDAS.includes(et)) filtro.etiquetas = et;
@@ -176,13 +190,31 @@ export async function publicas(req, res) {
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ ok: false, mensaje: 'Error listando públicas', error: e.message });
+    return res.status(500).json({ ok: false, mensaje: 'Error listando públicas', error: e.message });
   }
 }
 
-// ---------- Obtener una ----------
+// ---------- Detalle público (sin token) ----------
+export async function publicaUna(req, res) {
+  try {
+    const { id } = req.params;
+    if (!isValidId(id)) {
+      return res.status(400).json({ ok: false, mensaje: 'ID inválido' });
+    }
+
+    const doc = await Tarjeta.findById(id).lean();
+    // Por privacidad, respondemos 404 si no existe o no es pública
+    if (!doc || doc.visibilidad !== 'publico') {
+      return res.status(404).json({ ok: false, mensaje: 'No encontrada' });
+    }
+
+    return res.json({ ok: true, tarjeta: doc });
+  } catch (e) {
+    return res.status(500).json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
+  }
+}
+
+// ---------- Obtener una (privada: exige token) ----------
 export async function una(req, res) {
   try {
     const { id } = req.params;
@@ -198,9 +230,7 @@ export async function una(req, res) {
 
     return res.json({ ok: true, tarjeta: doc });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
+    return res.status(500).json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
   }
 }
 
@@ -211,53 +241,76 @@ export async function actualizar(req, res) {
     return res.status(400).json({ ok: false, mensaje: 'ID no válido' });
   }
 
-  // Extrae body con compat de campos opcionales/legados
+  // Cargamos el doc primero (para tratar lat/lng como pareja)
+  let doc = await Tarjeta.findOne({ _id: id, usuario: req.usuario.id });
+  if (!doc) return res.status(404).json({ ok: false, mensaje: 'Tarjeta no encontrada' });
+
   const body = req.body || {};
   const {
     titulo,
     descripcion,
-    imagenes,     // opcional (compat body)
-    imagenUrl,    // opcional (compat legado)
-    videoUrl,     // opcional (compat body)
+    imagenes,
+    imagenUrl,
+    videoUrl,
     visibilidad,
     etiquetas,
+    lat: latRaw,
+    lng: lngRaw,
   } = body;
 
-  // Extrae posibles subidas de media (imagenes/video)
   const { imagenesSubidas, videoUrlSubido } = extraerMediaDesdeFiles(req);
 
-  // Construye update solo con los campos presentes (parches idempotentes)
-  const update = {};
-  if (titulo !== undefined) update.titulo = String(titulo).trim();
-  if (descripcion !== undefined) update.descripcion = String(descripcion).trim();
+  // ——— Campos simples ———
+  if (titulo !== undefined) doc.titulo = String(titulo).trim();
+  if (descripcion !== undefined) doc.descripcion = String(descripcion).trim();
+  if (visibilidad !== undefined) doc.visibilidad = normalizarVisibilidad(visibilidad);
+  if (etiquetas !== undefined) doc.etiquetas = normalizarEtiquetas(etiquetas);
 
-  // Solo tocamos imágenes si llegan nuevas o si el body trae cambios explícitos
+  // ——— Imágenes ———
   if (imagenesSubidas.length || imagenes !== undefined || imagenUrl !== undefined) {
-    update.imagenes = normalizarImagenes({
+    doc.imagenes = normalizarImagenes({
       imagenesFiles: imagenesSubidas,
       imagenesBody: imagenes,
       imagenUrlBody: imagenUrl,
     });
   }
 
-  // Video: prioriza archivo subido; si no, usa texto del body (si viene)
+  // ——— Vídeo ———
   if (videoUrlSubido || videoUrl !== undefined) {
-    update.videoUrl = String(videoUrlSubido || videoUrl || '').trim();
+    doc.videoUrl = String(videoUrlSubido || videoUrl || '').trim();
   }
 
-  if (visibilidad !== undefined) update.visibilidad = normalizarVisibilidad(visibilidad);
-  if (etiquetas !== undefined) update.etiquetas = normalizarEtiquetas(etiquetas);
+  // ——— Ubicación (pareja lat/lng) ———
+  const latProvided = Object.prototype.hasOwnProperty.call(body, 'lat');
+  const lngProvided = Object.prototype.hasOwnProperty.call(body, 'lng');
+
+  if (latProvided || lngProvided) {
+    const latParsed = latProvided ? parseNum(latRaw) : doc.lat;
+    const lngParsed = lngProvided ? parseNum(lngRaw) : doc.lng;
+
+    const latFinal = latParsed == null ? undefined : latParsed;
+    const lngFinal = lngParsed == null ? undefined : lngParsed;
+
+    const unoSinOtro = (latFinal === undefined) !== (lngFinal === undefined);
+    if (unoSinOtro) {
+      return res.status(422).json({
+        ok: false,
+        mensaje: 'Debes proporcionar lat y lng juntos o ninguno',
+        errores: [{ campo: 'lat/lng', mensaje: 'Par incompleto' }],
+      });
+    }
+
+    doc.lat = latFinal;
+    doc.lng = lngFinal;
+  }
 
   try {
-    const doc = await Tarjeta.findOneAndUpdate(
-      { _id: id, usuario: req.usuario.id }, // asegura propiedad
-      update,
-      { new: true, runValidators: true }
-    );
-
-    if (!doc) return res.status(404).json({ ok: false, mensaje: 'Tarjeta no encontrada' });
+    await doc.save(); // ejecuta validaciones del esquema
     return res.json({ ok: true, tarjeta: doc });
   } catch (e) {
+    if (e?.name === 'ValidationError') {
+      return res.status(422).json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
+    }
     return res.status(500).json({ ok: false, mensaje: e.message });
   }
 }
@@ -276,9 +329,7 @@ export async function eliminar(req, res) {
     await doc.deleteOne();
     return res.json({ ok: true, mensaje: 'Eliminada' });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ ok: false, mensaje: 'Error eliminando', error: e.message });
+    return res.status(500).json({ ok: false, mensaje: 'Error eliminando', error: e.message });
   }
 }
 
@@ -300,8 +351,6 @@ export async function subirImagen(req, res) {
       size: req.file.size,
     });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ ok: false, mensaje: 'Error subiendo imagen', error: e.message });
+    return res.status(500).json({ ok: false, mensaje: 'Error subiendo imagen', error: e.message });
   }
 }

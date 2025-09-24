@@ -1,13 +1,13 @@
-// src/servicios/tarjetas.js (mejorado)
+// src/servicios/tarjetas.js
 import { API_URL, getToken } from './api';
 
-// Header Authorization común
+// Header Authorization (si hay token)
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
-// Igual que en api.js: parsea y lanza Error si !res.ok
+// Parse genérico con throw si !res.ok
 async function handle(res) {
   const ct = res.headers.get('content-type') || '';
   const isJson = ct.includes('application/json');
@@ -22,7 +22,7 @@ async function handle(res) {
   return data;
 }
 
-// Helper para querystrings
+// Helper querystring
 const qs = (obj = {}) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
@@ -34,7 +34,7 @@ const qs = (obj = {}) => {
 };
 
 export const tarjetasApi = {
-  // === públicas
+  // === públicas (listado)
   async publicas(params = {}) {
     const r = await fetch(`${API_URL}/api/tarjetas/publicas${qs(params)}`, {
       cache: 'no-store',
@@ -42,57 +42,72 @@ export const tarjetasApi = {
     return handle(r);
   },
 
+  // === pública (detalle) — IMPORTANTE: plural "publicas/:id"
+  async publicaUna(id, options = {}) {
+    const r = await fetch(`${API_URL}/api/tarjetas/publicas/${id}`, {
+      ...options,
+      cache: 'no-store',
+    });
+    return handle(r);
+  },
+
   // === privadas
-  async mias(params = {}) {
+  async mias(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/api/tarjetas/mias${qs(params)}`, {
-      headers: { ...authHeader() },
+      ...options,
+      headers: { ...authHeader(), ...(options.headers || {}) },
       cache: 'no-store',
     });
     return handle(r);
   },
 
-  async una(id) {
+  async una(id, options = {}) {
     const r = await fetch(`${API_URL}/api/tarjetas/${id}`, {
-      headers: { ...authHeader() },
+      ...options,
+      headers: { ...authHeader(), ...(options.headers || {}) },
       cache: 'no-store',
     });
     return handle(r);
   },
 
-  async crear(payload) {
+  async crear(payload, options = {}) {
     const r = await fetch(`${API_URL}/api/tarjetas`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      headers: { 'Content-Type': 'application/json', ...authHeader(), ...(options.headers || {}) },
       body: JSON.stringify(payload),
+      ...options,
     });
     return handle(r);
   },
 
-  async actualizar(id, payload) {
+  async actualizar(id, payload, options = {}) {
     const r = await fetch(`${API_URL}/api/tarjetas/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      headers: { 'Content-Type': 'application/json', ...authHeader(), ...(options.headers || {}) },
       body: JSON.stringify(payload),
+      ...options,
     });
     return handle(r);
   },
 
-  async eliminar(id) {
+  async eliminar(id, options = {}) {
     const r = await fetch(`${API_URL}/api/tarjetas/${id}`, {
       method: 'DELETE',
-      headers: { ...authHeader() },
+      headers: { ...authHeader(), ...(options.headers || {}) },
+      ...options,
     });
     return handle(r);
   },
 
   // Subida de 1 imagen (FormData)
-  async subirImagen(file) {
+  async subirImagen(file, options = {}) {
     const fd = new FormData();
     fd.append('file', file);
     const r = await fetch(`${API_URL}/api/tarjetas/subir-imagen`, {
       method: 'POST',
-      headers: { ...authHeader() }, // sin Content-Type manual
+      headers: { ...authHeader(), ...(options.headers || {}) }, // sin Content-Type manual
       body: fd,
+      ...options,
     });
     return handle(r);
   },

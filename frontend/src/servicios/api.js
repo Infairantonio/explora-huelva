@@ -1,12 +1,27 @@
-// src/servicios/api.js (mejorado + guarda token)
+// src/servicios/api.js
+// ————————————————————————————————————————————————
+// Cliente API centralizado: login, registro, perfil y fetch con token.
+// ————————————————————————————————————————————————
+
 const RAW_API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5174';
 // Quita una posible barra final para evitar //api/..
 export const API_URL = RAW_API_URL.replace(/\/+$/, '');
 
-export const getToken = () => {
-  try { return localStorage.getItem('token'); } catch { return ''; }
-};
+const TOKEN_KEY = 'token';
 
+// ——— Token helpers ———
+export const getToken = () => {
+  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+};
+export const setToken = (t) => {
+  try {
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch { /* modo privado duro u otros bloqueos */ }
+};
+export const logout = () => setToken(''); // deja vacío => borra
+
+// ——— Parse helper con errores enriquecidos ———
 async function parseAndThrowIfNotOk(res) {
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
@@ -22,29 +37,70 @@ async function parseAndThrowIfNotOk(res) {
   return data;
 }
 
-export async function getPerfil() {
-  const r = await fetch(`${API_URL}/api/auth/perfil`, {
-    headers: { Authorization: `Bearer ${getToken()}` }
-  });
-  if (r.status === 401) throw new Error('no-autorizado');
-  return r.json();
+// ——— fetch con Authorization automático ———
+export async function authFetch(url, options = {}) {
+  const token = getToken();
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  // No forzar Content-Type si el body es FormData/URLSearchParams/Blob/ArrayBuffer
+  const body = options.body;
+  const isFormData    = typeof FormData !== 'undefined' && body instanceof FormData;
+  const isURLParams   = typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams;
+  const isBlob        = typeof Blob !== 'undefined' && body instanceof Blob;
+  const isArrayBuffer = typeof ArrayBuffer !== 'undefined' &&
+                        (body instanceof ArrayBuffer || (typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(body)));
+
+  // Solo forzar JSON cuando el body es un objeto "normal" (no string ni binarios)
+  if (
+    body &&
+    !headers.has('Content-Type') &&
+    !isFormData && !isURLParams && !isBlob && !isArrayBuffer &&
+    typeof body !== 'string'
+  ) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const res = await fetch(url, { ...options, headers });
+
+  // Si 401 ⇒ token inválido/expirado: limpiamos
+  if (res.status === 401) {
+    logout();
+  }
+  return res;
 }
 
+// ——— Auth API ———
 export async function login({ email, password }) {
-  const r = await fetch(`${API_URL}/api/auth/login`, {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   });
-
-  const data = await parseAndThrowIfNotOk(r); // lanza Error si no ok
-
-  // ✅ Guarda el token para que el resto de peticiones lo usen automáticamente
-  try {
-    if (data?.token) localStorage.setItem('token', data.token);
-  } catch (_) {
-    // Si el navegador bloquea storage (modo privado duro), simplemente lo ignoramos
-  }
-
+  const data = await parseAndThrowIfNotOk(res);
+  if (data?.token) setToken(data.token);
   return data; // { ok, token, usuario }
 }
+
+export async function register({ nombre, email, password }) {
+  const res = await fetch(`${API_URL}/api/auth/registrar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre, email, password })
+  });
+  const data = await parseAndThrowIfNotOk(res);
+  if (data?.token) setToken(data.token); // auto-login tras registro
+  return data;
+}
+
+export async function getPerfil() {
+  const res = await authFetch(`${API_URL}/api/auth/perfil`);
+  if (res.status === 401) throw new Error('no-autorizado');
+  return parseAndThrowIfNotOk(res);
+}
+
+// ——— Ejemplo de uso genérico con authFetch ———
+// export async function getMisTarjetas() {
+//   const res = await authFetch(`${API_URL}/api/tarjetas/mias`);
+//   return parseAndThrowIfNotOk(res);
+// }
