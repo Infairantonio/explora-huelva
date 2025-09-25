@@ -3,8 +3,8 @@
 // Cliente API centralizado: login, registro, perfil y fetch con token.
 // ————————————————————————————————————————————————
 
-const RAW_API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5174';
-// Quita una posible barra final para evitar //api/..
+const RAW_API_URL = (import.meta.env.VITE_API_URL ?? '/api');
+// Quita una posible barra final para evitar //api/.. o //auth/..
 export const API_URL = RAW_API_URL.replace(/\/+$/, '');
 
 const TOKEN_KEY = 'token';
@@ -48,8 +48,10 @@ export async function authFetch(url, options = {}) {
   const isFormData    = typeof FormData !== 'undefined' && body instanceof FormData;
   const isURLParams   = typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams;
   const isBlob        = typeof Blob !== 'undefined' && body instanceof Blob;
-  const isArrayBuffer = typeof ArrayBuffer !== 'undefined' &&
-                        (body instanceof ArrayBuffer || (typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(body)));
+  const isArrayBuffer =
+    typeof ArrayBuffer !== 'undefined' &&
+    (body instanceof ArrayBuffer ||
+     (typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(body)));
 
   // Solo forzar JSON cuando el body es un objeto "normal" (no string ni binarios)
   if (
@@ -72,7 +74,7 @@ export async function authFetch(url, options = {}) {
 
 // ——— Auth API ———
 export async function login({ email, password }) {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+  const res = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
@@ -83,7 +85,7 @@ export async function login({ email, password }) {
 }
 
 export async function register({ nombre, email, password }) {
-  const res = await fetch(`${API_URL}/api/auth/registrar`, {
+  const res = await fetch(`${API_URL}/auth/registrar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nombre, email, password })
@@ -94,13 +96,13 @@ export async function register({ nombre, email, password }) {
 }
 
 export async function getPerfil() {
-  const res = await authFetch(`${API_URL}/api/auth/perfil`);
+  const res = await authFetch(`${API_URL}/auth/perfil`);
   if (res.status === 401) throw new Error('no-autorizado');
   return parseAndThrowIfNotOk(res);
 }
 
 // ——— Ejemplo de uso genérico con authFetch ———
 // export async function getMisTarjetas() {
-//   const res = await authFetch(`${API_URL}/api/tarjetas/mias`);
+//   const res = await authFetch(`${API_URL}/tarjetas/mias`);
 //   return parseAndThrowIfNotOk(res);
 // }

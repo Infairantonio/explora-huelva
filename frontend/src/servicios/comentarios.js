@@ -9,7 +9,7 @@
 
 import { API_URL, authFetch } from './api';
 
-// Helper: parsea respuesta y lanza Error si !res.ok (igual patrón que en otros servicios)
+// Helper: parsea respuesta y lanza Error si !res.ok
 async function handle(res) {
   const ct = res.headers.get('content-type') || '';
   const isJson = ct.includes('application/json');
@@ -43,7 +43,7 @@ export const comentariosApi = {
    * @param {{signal?:AbortSignal}} [opts]
    */
   async listar(tarjetaId, params = {}, opts = {}) {
-    const url = `${API_URL}/api/tarjetas/${encodeURIComponent(tarjetaId)}/comentarios${qs(params)}`;
+    const url = `${API_URL}/tarjetas/${encodeURIComponent(tarjetaId)}/comentarios${qs(params)}`;
     const res = await fetch(url, { signal: opts.signal, cache: 'no-store' });
     return handle(res); // { ok, items, meta }
     // Si la tarjeta no es pública, el backend responderá 403.
@@ -57,7 +57,7 @@ export const comentariosApi = {
    */
   async crear(tarjetaId, body, opts = {}) {
     const res = await authFetch(
-      `${API_URL}/api/tarjetas/${encodeURIComponent(tarjetaId)}/comentarios`,
+      `${API_URL}/tarjetas/${encodeURIComponent(tarjetaId)}/comentarios`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,7 +75,7 @@ export const comentariosApi = {
    */
   async eliminar(comentarioId, opts = {}) {
     const res = await authFetch(
-      `${API_URL}/api/comentarios/${encodeURIComponent(comentarioId)}`,
+      `${API_URL}/comentarios/${encodeURIComponent(comentarioId)}`,
       { method: 'DELETE', signal: opts.signal }
     );
     return handle(res); // { ok, mensaje }

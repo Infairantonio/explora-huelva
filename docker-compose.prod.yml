@@ -1,0 +1,53 @@
+services:
+  mongo:
+    image: mongo:6
+    container_name: explora-mongo-1
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_RAIZ_USUARIO:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_RAIZ_PASSWORD:-root}
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build:
+      context: ./backend
+    container_name: explora-api-1
+    restart: unless-stopped
+    environment:
+      CADENA_MONGO: mongodb://root:root@mongo:27017/explora?authSource=admin
+      MONGO_RAIZ_USUARIO: root
+      MONGO_RAIZ_PASSWORD: root
+      MONGO_NOMBRE_BD: explora
+      JWT_SECRETO: supersecreto
+      FRONT_ORIGEN: https://explorahuelva.es
+    depends_on:
+      - mongo
+    ports:
+      - "4000:5174"   # host:contenedor (tu app escucha en 5174 dentro)
+
+  web:
+    build:
+      context: ./frontend
+    container_name: explora-web-1
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: explora-caddy-1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv/web_explora:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  mongo_data:
+  caddy_data:
+  caddy_config:

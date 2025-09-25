@@ -26,6 +26,10 @@ const toNum = (s) => {
   return Number.isFinite(n) ? n : NaN;
 };
 
+// Detecta cancelación para no ensuciar la UI
+const isAbortError = (e) =>
+  e?.name === 'AbortError' || e?.code === 'ERR_CANCELED' || /abort(ed)?/i.test(e?.message || '');
+
 export default function EditorTarjeta() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -61,30 +65,29 @@ export default function EditorTarjeta() {
     const controller = new AbortController();
     loadAbortRef.current = controller;
 
-    const r = await tarjetasApi.una(id, { signal: controller.signal });
-
-    if (r.status === 401) {
-      logout();
-      navigate('/login', { replace: true, state: { from: location } });
-      return;
+    try {
+      const r = await tarjetasApi.una(id, { signal: controller.signal });
+      const t = r.tarjeta || {};
+      setForm({
+        titulo: t.titulo || '',
+        descripcion: t.descripcion || '',
+        imagenes: Array.isArray(t.imagenes) ? t.imagenes : (t.imagenUrl ? [t.imagenUrl] : []),
+        videoUrl: t.videoUrl || '',
+        visibilidad: t.visibilidad || 'privado',
+        etiquetas: Array.isArray(t.etiquetas) ? t.etiquetas : [],
+        lat: (t.lat ?? '') === '' || t.lat == null ? '' : String(t.lat),
+        lng: (t.lng ?? '') === '' || t.lng == null ? '' : String(t.lng),
+      });
+      setAccuracy(null);
+    } catch (e) {
+      if (isAbortError(e)) return;
+      if (e?.status === 401) {
+        logout();
+        navigate('/login', { replace: true, state: { from: location } });
+        return;
+      }
+      setMensaje(e?.message || 'No se pudo cargar');
     }
-    if (!r.ok) {
-      setMensaje(r.mensaje || 'No se pudo cargar');
-      return;
-    }
-
-    const t = r.tarjeta || {};
-    setForm({
-      titulo: t.titulo || '',
-      descripcion: t.descripcion || '',
-      imagenes: Array.isArray(t.imagenes) ? t.imagenes : (t.imagenUrl ? [t.imagenUrl] : []),
-      videoUrl: t.videoUrl || '',
-      visibilidad: t.visibilidad || 'privado',
-      etiquetas: Array.isArray(t.etiquetas) ? t.etiquetas : [],
-      lat: (t.lat ?? '') === '' || t.lat == null ? '' : String(t.lat),
-      lng: (t.lng ?? '') === '' || t.lng == null ? '' : String(t.lng),
-    });
-    setAccuracy(null);
   }, [id, navigate, location]);
 
   useEffect(() => {
@@ -120,25 +123,25 @@ export default function EditorTarjeta() {
     const controller = new AbortController();
     uploadAbortRef.current = controller;
 
-    setSubiendo(true);
-    const r = await tarjetasApi.subirImagen(f, { signal: controller.signal });
-    setSubiendo(false);
-
-    if (r.status === 401) {
-      logout();
-      navigate('/login', { replace: true, state: { from: location } });
-      return;
+    try {
+      setSubiendo(true);
+      const r = await tarjetasApi.subirImagen(f, { signal: controller.signal });
+      // Añadir URL evitando duplicados
+      setForm((prev) => {
+        const set = new Set([...(prev.imagenes || []), r.url].filter(Boolean));
+        return { ...prev, imagenes: Array.from(set) };
+      });
+    } catch (e2) {
+      if (isAbortError(e2)) return;
+      if (e2?.status === 401) {
+        logout();
+        navigate('/login', { replace: true, state: { from: location } });
+        return;
+      }
+      setMensaje(e2?.message || 'Error subiendo la imagen');
+    } finally {
+      setSubiendo(false);
     }
-    if (!r.ok || !r.url) {
-      setMensaje(r.mensaje || 'Error subiendo la imagen');
-      return;
-    }
-
-    // Añadir URL evitando duplicados
-    setForm((prev) => {
-      const set = new Set([...(prev.imagenes || []), r.url]);
-      return { ...prev, imagenes: Array.from(set) };
-    });
   };
 
   const quitarImagen = (idx) =>
@@ -189,7 +192,6 @@ export default function EditorTarjeta() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy: acc } = pos.coords;
-        // 6 decimales (~11 cm); más que suficiente
         setForm((f) => ({
           ...f,
           lat: String(latitude.toFixed(6)),
@@ -242,23 +244,21 @@ export default function EditorTarjeta() {
         : {}),
     };
 
-    setGuardando(true);
-    const r = id
-      ? await tarjetasApi.actualizar(id, payload)
-      : await tarjetasApi.crear(payload);
-    setGuardando(false);
-
-    if (r.status === 401) {
-      logout();
-      navigate('/login', { replace: true, state: { from: location } });
-      return;
+    try {
+      setGuardando(true);
+      if (id) await tarjetasApi.actualizar(id, payload);
+      else await tarjetasApi.crear(payload);
+      navigate('/panel', { replace: true });
+    } catch (e2) {
+      if (e2?.status === 401) {
+        logout();
+        navigate('/login', { replace: true, state: { from: location } });
+        return;
+      }
+      setMensaje(e2?.message || 'Error guardando');
+    } finally {
+      setGuardando(false);
     }
-    if (!r.ok) {
-      setMensaje(r.mensaje || 'Error guardando');
-      return;
-    }
-
-    navigate('/panel', { replace: true });
   };
 
   return (
@@ -276,21 +276,21 @@ export default function EditorTarjeta() {
                 <div className="col-12">
                   <label className="form-label">Título</label>
                   <input
-                    className={`form-control ${faltan.titulo ? 'is-invalid' : ''}`}
+                    className={`form-control ${!form.titulo.trim() ? 'is-invalid' : ''}`}
                     name="titulo"
                     value={form.titulo}
                     onChange={cambiar}
                     maxLength={120}
                     required
                   />
-                  {faltan.titulo && <div className="invalid-feedback">El título es obligatorio.</div>}
+                  {!form.titulo.trim() && <div className="invalid-feedback">El título es obligatorio.</div>}
                 </div>
 
                 {/* Descripción */}
                 <div className="col-12">
                   <label className="form-label">Descripción</label>
                   <textarea
-                    className={`form-control ${faltan.descripcion ? 'is-invalid' : ''}`}
+                    className={`form-control ${!form.descripcion.trim() ? 'is-invalid' : ''}`}
                     rows={4}
                     name="descripcion"
                     value={form.descripcion}
@@ -298,7 +298,7 @@ export default function EditorTarjeta() {
                     maxLength={1000}
                     required
                   />
-                  {faltan.descripcion && <div className="invalid-feedback">La descripción es obligatoria.</div>}
+                  {!form.descripcion.trim() && <div className="invalid-feedback">La descripción es obligatoria.</div>}
                 </div>
 
                 {/* Imágenes */}
@@ -346,7 +346,7 @@ export default function EditorTarjeta() {
                       </div>
                     ))}
                   </div>
-                  {faltan.imagenes && (
+                  {(form.imagenes || []).length === 0 && (
                     <div className="text-danger small mt-2">Añade al menos una imagen.</div>
                   )}
                 </div>
@@ -369,7 +369,7 @@ export default function EditorTarjeta() {
                 <div className="col-12 col-md-4">
                   <label className="form-label">Visibilidad</label>
                   <select
-                    className={`form-select ${faltan.visibilidad ? 'is-invalid' : ''}`}
+                    className={`form-select ${!['publico', 'privado'].includes(form.visibilidad) ? 'is-invalid' : ''}`}
                     name="visibilidad"
                     value={form.visibilidad}
                     onChange={cambiar}
@@ -378,7 +378,9 @@ export default function EditorTarjeta() {
                     <option value="privado">Privado</option>
                     <option value="publico">Público</option>
                   </select>
-                  {faltan.visibilidad && <div className="invalid-feedback">Selecciona una visibilidad.</div>}
+                  {!['publico', 'privado'].includes(form.visibilidad) && (
+                    <div className="invalid-feedback">Selecciona una visibilidad.</div>
+                  )}
                 </div>
 
                 {/* Etiquetas */}
@@ -400,7 +402,7 @@ export default function EditorTarjeta() {
                       </div>
                     ))}
                   </div>
-                  {faltan.etiquetas && (
+                  {(form.etiquetas || []).length === 0 && (
                     <div className="text-danger small mt-1">Selecciona al menos una etiqueta.</div>
                   )}
                 </div>
@@ -429,7 +431,7 @@ export default function EditorTarjeta() {
                         step="any"
                         min={-90}
                         max={90}
-                        className={`form-control ${!ubicacionOk && latProvided ? 'is-invalid' : ''}`}
+                        className={`form-control ${latProvided && !ubicacionOk ? 'is-invalid' : ''}`}
                         name="lat"
                         value={form.lat}
                         onChange={cambiar}
@@ -442,7 +444,7 @@ export default function EditorTarjeta() {
                         step="any"
                         min={-180}
                         max={180}
-                        className={`form-control ${!ubicacionOk && lngProvided ? 'is-invalid' : ''}`}
+                        className={`form-control ${lngProvided && !ubicacionOk ? 'is-invalid' : ''}`}
                         name="lng"
                         value={form.lng}
                         onChange={cambiar}

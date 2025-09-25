@@ -36,15 +36,15 @@ const qs = (obj = {}) => {
 export const tarjetasApi = {
   // === públicas (listado)
   async publicas(params = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas/publicas${qs(params)}`, {
+    const r = await fetch(`${API_URL}/tarjetas/publicas${qs(params)}`, {
       cache: 'no-store',
     });
     return handle(r);
   },
 
-  // === pública (detalle) — IMPORTANTE: plural "publicas/:id"
+  // === pública (detalle)
   async publicaUna(id, options = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas/publicas/${id}`, {
+    const r = await fetch(`${API_URL}/tarjetas/publicas/${id}`, {
       ...options,
       cache: 'no-store',
     });
@@ -53,7 +53,7 @@ export const tarjetasApi = {
 
   // === privadas
   async mias(params = {}, options = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas/mias${qs(params)}`, {
+    const r = await fetch(`${API_URL}/tarjetas/mias${qs(params)}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
       cache: 'no-store',
@@ -62,7 +62,7 @@ export const tarjetasApi = {
   },
 
   async una(id, options = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas/${id}`, {
+    const r = await fetch(`${API_URL}/tarjetas/${id}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
       cache: 'no-store',
@@ -71,7 +71,7 @@ export const tarjetasApi = {
   },
 
   async crear(payload, options = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas`, {
+    const r = await fetch(`${API_URL}/tarjetas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeader(), ...(options.headers || {}) },
       body: JSON.stringify(payload),
@@ -81,7 +81,7 @@ export const tarjetasApi = {
   },
 
   async actualizar(id, payload, options = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas/${id}`, {
+    const r = await fetch(`${API_URL}/tarjetas/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeader(), ...(options.headers || {}) },
       body: JSON.stringify(payload),
@@ -91,7 +91,7 @@ export const tarjetasApi = {
   },
 
   async eliminar(id, options = {}) {
-    const r = await fetch(`${API_URL}/api/tarjetas/${id}`, {
+    const r = await fetch(`${API_URL}/tarjetas/${id}`, {
       method: 'DELETE',
       headers: { ...authHeader(), ...(options.headers || {}) },
       ...options,
@@ -103,7 +103,7 @@ export const tarjetasApi = {
   async subirImagen(file, options = {}) {
     const fd = new FormData();
     fd.append('file', file);
-    const r = await fetch(`${API_URL}/api/tarjetas/subir-imagen`, {
+    const r = await fetch(`${API_URL}/tarjetas/subir-imagen`, {
       method: 'POST',
       headers: { ...authHeader(), ...(options.headers || {}) }, // sin Content-Type manual
       body: fd,

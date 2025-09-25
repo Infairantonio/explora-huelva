@@ -2,16 +2,14 @@
 // Portada pública:
 // 1) Hero con el claim de la web
 // 2) Grid con tarjetas PÚBLICAS (visibilidad = 'publico')
-// 3) (opcional) Panel de estado para diagnosticar la API
+// 3) Panel de estado para diagnosticar la API (ping a /api/salud)
 
 import { useEffect, useState } from 'react';
 import Hero from '../componentes/Hero';
 import TarjetaCard from '../componentes/TarjetaCard.jsx';
 import { tarjetasApi } from '../servicios/tarjetas';
+import { API_URL } from '../servicios/api'; // ✅ usa la misma base que el resto de servicios
 import banner from '../imagenes/banner.jpg';
-
-// Para el Panel de Estado (ping a /api/salud)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5174';
 
 export default function Inicio() {
   // Estado para /api/salud (solo diagnóstico)
@@ -26,15 +24,13 @@ export default function Inicio() {
   });
 
   useEffect(() => {
-    // 1) Llamada de salud (diagnóstico)
-    fetch(`${API_URL}/api/salud`)
+    // 1) Llamada de salud (diagnóstico) — evita /api/api usando API_URL común
+    fetch(`${API_URL}/salud`)
       .then((r) => r.json())
       .then(setSalud)
       .catch((err) => setError(err.message));
 
-    // 2) Carga de tarjetas públicas
-    //    No requiere token. Si en el futuro quieres filtrar por etiqueta o búsqueda:
-    //    tarjetasApi.publicas({ etiqueta: 'rutas', q: 'marismas', page: 1 })
+    // 2) Carga de tarjetas públicas (sin token)
     tarjetasApi.publicas()
       .then((r) => {
         if (!r.ok) throw new Error(r.mensaje || 'No se pudieron cargar las tarjetas públicas');
@@ -89,7 +85,7 @@ export default function Inicio() {
         <h3 className="mb-3 text-primary fw-bold">Panel de Estado</h3>
         <div className="card shadow-sm border-0" style={{ backgroundColor: 'var(--azul-claro)' }}>
           <div className="card-body">
-            <p><strong>VITE_API_URL:</strong> {API_URL}</p>
+            <p><strong>API_URL efectiva:</strong> {API_URL}</p>
 
             {/* Estado de la llamada a /api/salud */}
             {error && <div className="alert alert-danger">Error: {error}</div>}

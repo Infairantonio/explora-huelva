@@ -1,0 +1,33 @@
+www.explorahuelva.es {
+    redir https://explorahuelva.es{uri}
+}
+
+explorahuelva.es {
+    encode gzip
+
+    # --- API ---
+    handle /api/* {
+        reverse_proxy api:5174
+    }
+
+    # --- Uploads (servidos por la API) ---
+    handle /uploads/* {
+        reverse_proxy api:5174
+    }
+
+    # --- Frontend estático ---
+    root * /srv/web_explora
+    file_server
+
+    # Fallback SPA (excluir /api y /uploads)
+    @notStatic {
+        not path /assets/* /favicon.ico /robots.txt /api/* /uploads/*
+    }
+    rewrite @notStatic /index.html
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}

@@ -29,25 +29,20 @@ export default function Panel() {
     abortRef.current = controller;
 
     try {
-      const r = await tarjetasApi.mias({ signal: controller.signal });
+      // ✅ signal en el 2º argumento (options), no en params
+      const r = await tarjetasApi.mias({}, { signal: controller.signal });
+      setItems(Array.isArray(r.items) ? r.items : []);
+    } catch (e) {
+      // Ignora aborts intencionales
+      if (e?.name === 'AbortError') return;
 
-      // 401 → sesión inválida/expirada: limpiamos token y vamos a login
-      if (r?.status === 401) {
+      // ✅ 401 se maneja aquí (handle() ya lanzó el error)
+      if (e?.status === 401) {
         logout();
         navigate('/login', { replace: true, state: { from: { pathname: '/panel' } } });
         return;
       }
 
-      if (!r?.ok) {
-        setMensaje(r?.mensaje || 'No se pudieron cargar tus tarjetas');
-        setItems([]);
-        return;
-      }
-
-      setItems(Array.isArray(r.items) ? r.items : []);
-    } catch (e) {
-      // Ignora aborts intencionales
-      if (e?.name === 'AbortError') return;
       setMensaje(e?.message || 'Error de red');
       setItems([]);
     } finally {
@@ -59,7 +54,6 @@ export default function Panel() {
     cargar();
     // Cleanup al desmontar: aborta la petición en vuelo
     return () => abortRef.current?.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargar]);
 
   // Eliminar con borrado optimista
