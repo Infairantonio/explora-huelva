@@ -21,6 +21,8 @@ services:
       MONGO_NOMBRE_BD: explora
       JWT_SECRETO: supersecreto
       FRONT_ORIGEN: https://explorahuelva.es
+      volumes:
+      - ./backend/uploads:/app/uploads   # 👈 persistimos subidas en el host
     depends_on:
       - mongo
     ports:
