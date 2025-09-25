@@ -41,3 +41,6 @@ pnpm-debug.log*
 uploads/
 backend/uploads/
 frontend/uploads/
+
+explora.tgz
+
