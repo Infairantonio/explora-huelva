@@ -53,7 +53,7 @@ export default function Inicio() {
       {/* Bloque tarjetas públicas (portada) */}
       <div className="container my-4">
         <div className="d-flex align-items-center justify-content-between mb-3">
-          <h2 className="mb-0 text-primary fw-bold">Des Huelva</h2>
+          <h2 className="mb-0 text-primary fw-bold">Descubre Huelva</h2>
         </div>
 
         {/* Estados de carga / error / vacío / listado */}
