@@ -1,4 +1,5 @@
-﻿// ---------------------------------------------------------------------------------
+﻿// src/main.jsx
+// ---------------------------------------------------------------------------------
 // Punto de entrada del frontend (Vite).
 // ---------------------------------------------------------------------------------
 
@@ -20,6 +21,7 @@ import EditorTarjeta from "./paginas/EditorTarjeta.jsx";
 import RutaPrivada from "./componentes/RutaProtegida.jsx";
 import TarjetaPublica from "./paginas/TarjetaPublica.jsx";
 import Lugares from "./paginas/Lugares.jsx"; // ← Listado público por etiqueta
+import AdminTarjetas from "./paginas/AdminTarjetas.jsx"; // ← NUEVO: panel admin
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -63,6 +65,16 @@ createRoot(document.getElementById("root")).render(
             element={
               <RutaPrivada>
                 <EditorTarjeta />
+              </RutaPrivada>
+            }
+          />
+
+          {/* Admin (requiere token; el backend valida rol=admin) */}
+          <Route
+            path="admin/tarjetas"
+            element={
+              <RutaPrivada>
+                <AdminTarjetas />
               </RutaPrivada>
             }
           />
