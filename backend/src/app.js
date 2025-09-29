@@ -15,10 +15,11 @@ import fs from "fs"; // Sistema de archivos (para crear /uploads si falta)
 import path from "path"; // Utilidades de rutas de archivos
 
 // Rutas de la aplicación (se importan ya configuradas como routers)
-import rutaSalud from "./rutas/salud.ruta.js";      // /api/salud (pong)
-import rutaAuth from "./rutas/auth.ruta.js";        // /api/auth (login / registro)
-import rutaTarjetas from "./rutas/tarjetas.ruta.js"; // /api/tarjetas (CRUD)
+import rutaSalud from "./rutas/salud.ruta.js";             // /api/salud (pong)
+import rutaAuth from "./rutas/auth.ruta.js";               // /api/auth (login / registro)
+import rutaTarjetas from "./rutas/tarjetas.ruta.js";       // /api/tarjetas (CRUD)
 import rutaComentarios from "./rutas/comentarios.ruta.js"; // /api/tarjetas/:id/comentarios, /api/comentarios/:id
+import adminTarjetasRouter from "./rutas/admin.tarjetas.ruta.js"; // /api/admin/* (solo admin)
 
 // Instancia de la app Express
 const app = express();
@@ -73,11 +74,10 @@ app.use(
   })
 );
 
-// Parser JSON del body (con límite por defecto). Si en el futuro se suben
-// payloads grandes, se puede aumentar: express.json({ limit: "2mb" })
+// Parser JSON del body (con límite por defecto)
 app.use(express.json());
 
-// Ruta raíz informativa, útil como verificación rápida de servicio vivo
+// Ruta raíz informativa
 app.get("/", (_req, res) => {
   res.json({
     ok: true,
@@ -87,41 +87,37 @@ app.get("/", (_req, res) => {
   });
 });
 
-// Registro de routers de la API (mantiene prefijos claros y versionables en el futuro)
+// Registro de routers de la API
 app.use("/api/salud", rutaSalud);
 app.use("/api/auth", rutaAuth);
 app.use("/api/tarjetas", rutaTarjetas);
-app.use("/api", rutaComentarios); // ← rutas de comentarios (GET/POST/DELETE)
+app.use("/api", rutaComentarios);      // comentarios
+app.use("/api", adminTarjetasRouter);  // rutas admin (tarjetas)
 
-// Middleware de manejo básico de errores (mejora leve):
-// Centraliza errores no capturados en rutas y devuelve JSON homogéneo
+// Middleware de manejo básico de errores
 app.use((err, _req, res, _next) => {
   console.error("❌ Error no controlado:", err);
   res.status(err.status || 500).json({ ok: false, mensaje: err.message || "Error interno" });
 });
 
-// Arranque del servidor HTTP + conexión a MongoDB
-// Nota: Se mantiene la semántica original (levantar servidor y luego conectar).
-// Si prefieres ser estricto, podrías conectar primero y luego app.listen().
+// Arranque del servidor + conexión a MongoDB
 app.listen(PUERTO, () => {
   console.log(`✅ API escuchando en http://localhost:${PUERTO}`);
 
   if (!CADENA_MONGO) {
     console.warn("⚠️  Falta CADENA_MONGO en variables de entorno");
-    return; // Evita intentar conectar sin cadena
+    return;
   }
 
-  // Ajuste recomendado por Mongoose para queries estrictas (opcional, no disruptivo)
   mongoose.set("strictQuery", true);
 
-  // Conexión a MongoDB
   mongoose
     .connect(CADENA_MONGO)
     .then(() => console.log("✅ Conectado a MongoDB"))
     .catch((err) => console.error("❌ Error conectando a MongoDB:", err.message));
 });
 
-// Manejo de promesas no gestionadas a nivel proceso (pequeña red de seguridad)
+// Manejo de promesas no gestionadas a nivel proceso
 process.on("unhandledRejection", (reason) => {
   console.error("⚠️  Promesa no manejada:", reason);
 });

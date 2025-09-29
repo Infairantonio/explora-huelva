@@ -75,12 +75,15 @@ export default function Panel() {
     }
   };
 
+  // 🔒 Red de seguridad: no mostrar eliminadas en el panel
+  const visibles = (items || []).filter(it => !it?.eliminado);
+
   return (
     <div className="container py-4">
       {/* Cabecera */}
       <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <h1 className="h4 mb-2 mb-sm-0">
-          Mis tarjetas {items?.length ? <small className="text-muted">({items.length})</small> : null}
+          Mis tarjetas {visibles?.length ? <small className="text-muted">({visibles.length})</small> : null}
         </h1>
         <div className="d-flex gap-2">
           <button className="btn btn-outline-secondary" onClick={cargar} disabled={cargando}>
@@ -101,13 +104,13 @@ export default function Panel() {
           <div className="spinner-border" role="status" aria-label="Cargando" />
           <span>Cargando…</span>
         </div>
-      ) : items.length === 0 ? (
+      ) : visibles.length === 0 ? (
         <div className="alert alert-info">
           Aún no tienes tarjetas. Crea la primera con el botón <strong>Nueva</strong>.
         </div>
       ) : (
         <div className="row g-3">
-          {items.map((it) => (
+          {visibles.map((it) => (
             <div key={it._id} className="col-12 col-sm-6 col-lg-4">
               <TarjetaCard
                 item={it}
