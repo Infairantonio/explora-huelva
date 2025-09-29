@@ -75,6 +75,9 @@ function buildMapsUrl(lat, lng) {
 }
 
 function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana = false }) {
+  // No renderizar tarjetas marcadas como eliminadas (red de seguridad)
+  if (item?.eliminado) return null;
+
   const imagenes = Array.isArray(item?.imagenes)
     ? item.imagenes
     : (item?.imagenUrl ? [item.imagenUrl] : []);
@@ -242,6 +245,7 @@ TarjetaCard.propTypes = {
     videoUrl: PropTypes.string,
     lat: PropTypes.number,           // opcional
     lng: PropTypes.number,           // opcional
+    eliminado: PropTypes.bool,       // ⬅️ nuevo (soft delete)
   }).isRequired,
   onEdit: PropTypes.func,
   onDelete: PropTypes.func,

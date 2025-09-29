@@ -1,4 +1,4 @@
-// Inicio.jsx
+// src/paginas/Inicio.jsx
 // Portada pública:
 // 1) Hero con el claim de la web
 // 2) Grid con tarjetas PÚBLICAS (visibilidad = 'publico')
@@ -39,6 +39,9 @@ export default function Inicio() {
       .catch((e) => setPub({ cargando: false, error: e.message, items: [] }));
   }, []);
 
+  // Red de seguridad en cliente: no mostrar tarjetas marcadas como eliminadas
+  const visibles = (pub.items || []).filter((t) => !t?.eliminado);
+
   return (
     <>
       {/* Hero superior con un fondo bonito */}
@@ -64,16 +67,13 @@ export default function Inicio() {
           </div>
         ) : pub.error ? (
           <div className="alert alert-danger">Error: {pub.error}</div>
-        ) : pub.items.length === 0 ? (
+        ) : visibles.length === 0 ? (
           <div className="alert alert-info">Aún no hay tarjetas públicas.</div>
         ) : (
           <div className="row g-3">
-            {pub.items.map((it) => (
+            {visibles.map((it) => (
               <div key={it._id} className="col-12 col-sm-6 col-lg-4">
-                <TarjetaCard
-                  item={it}
-                  detalleHref={`/tarjetas/${it._id}`}
-                />
+                <TarjetaCard item={it} detalleHref={`/tarjetas/${it._id}`} />
               </div>
             ))}
           </div>

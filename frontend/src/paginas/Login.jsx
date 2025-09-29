@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { login, getPerfil } from "../servicios/api";
+import { soyAdmin } from "../servicios/adminTarjetas";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("");      // ← corregido
   const [password, setPassword] = useState("");
 
   const [cargando, setCargando] = useState(false);
@@ -17,13 +18,30 @@ export default function Login() {
   const next = params.get("next") || "/panel";
   const fromState = location.state?.from?.pathname;
 
+  // Decide a dónde enviar tras validar sesión según permisos
+  const irSegunPermisos = async () => {
+    try {
+      const esAdmin = await soyAdmin(); // consulta /api/admin/tarjetas con el token
+      if (esAdmin) {
+        navigate("/admin/tarjetas", { replace: true });
+      } else {
+        navigate(fromState || next, { replace: true });
+      }
+    } catch {
+      // ante fallo de red, seguimos el flujo normal
+      navigate(fromState || next, { replace: true });
+    }
+  };
+
   // Si ya hay token válido, saltamos el login directamente
   useEffect(() => {
     (async () => {
       try {
         const me = await getPerfil(); // lanza si no autorizado
-        if (me?.ok) navigate(fromState || next, { replace: true });
-      } catch { /* no autorizado */ }
+        if (me?.ok) await irSegunPermisos();
+      } catch {
+        /* no autorizado */
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -36,11 +54,8 @@ export default function Login() {
     setCargando(true);
     try {
       const data = await login({ email, password }); // guarda token
-      if (data?.ok) {
-        navigate(fromState || next, { replace: true });
-      } else {
-        throw new Error("Credenciales incorrectas");
-      }
+      if (!data?.ok) throw new Error("Credenciales incorrectas");
+      await irSegunPermisos();
     } catch (err) {
       const msg = err?.message || "Error al iniciar sesión";
       setMensaje("❌ " + msg);
