@@ -1,9 +1,11 @@
 // src/paginas/EditorTarjeta.jsx
-// Pantalla para crear o editar una tarjeta (todos los campos obligatorios salvo vídeo y lat/lng).
+// Pantalla para crear o editar una tarjeta (vídeo y lat/lng ocultos por ahora, conservando código comentado)
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { tarjetasApi } from '../servicios/tarjetas';
+// ❌ ya no necesitamos transformar URLs aquí: la API devuelve /api/uploads/...
+// import { urlImagen } from '../servicios/api';
 import { logout } from '../utils/auth';
 
 const OPCIONES_ETIQUETAS = ['lugares', 'experiencias', 'rutas'];
@@ -71,6 +73,7 @@ export default function EditorTarjeta() {
       setForm({
         titulo: t.titulo || '',
         descripcion: t.descripcion || '',
+        // La API ya normaliza a "/api/uploads/...", úsalo tal cual
         imagenes: Array.isArray(t.imagenes) ? t.imagenes : (t.imagenUrl ? [t.imagenUrl] : []),
         videoUrl: t.videoUrl || '',
         visibilidad: t.visibilidad || 'privado',
@@ -126,9 +129,13 @@ export default function EditorTarjeta() {
     try {
       setSubiendo(true);
       const r = await tarjetasApi.subirImagen(f, { signal: controller.signal });
+      // ⬇️ La API ahora devuelve { publicUrl, filename, url }. Para el front usamos publicUrl.
+      const nueva = r.publicUrl || r.url; // fallback por si no actualizaste aún el backend
+      if (!nueva) throw new Error('Respuesta inesperada al subir imagen');
+
       // Añadir URL evitando duplicados
       setForm((prev) => {
-        const set = new Set([...(prev.imagenes || []), r.url].filter(Boolean));
+        const set = new Set([...(prev.imagenes || []), nueva].filter(Boolean));
         return { ...prev, imagenes: Array.from(set) };
       });
     } catch (e2) {
@@ -155,7 +162,7 @@ export default function EditorTarjeta() {
     });
   };
 
-  // Reglas de obligatoriedad (vídeo es opcional)
+  // Reglas de obligatoriedad (vídeo es opcional pero lo ocultamos)
   const faltan = {
     titulo: !form.titulo.trim(),
     descripcion: !form.descripcion.trim(),
@@ -166,19 +173,18 @@ export default function EditorTarjeta() {
   const obligatorioOk =
     !faltan.titulo && !faltan.descripcion && !faltan.visibilidad && !faltan.etiquetas && !faltan.imagenes;
 
-  // Validación de ubicación (opcional pero pareja consistente y en rango)
+  // Validación de ubicación (oculta lat/lng pero mantenemos la lógica para no romper)
   const latProvided = String(form.lat ?? '').trim() !== '';
   const lngProvided = String(form.lng ?? '').trim() !== '';
   const latNum = toNum(form.lat);
   const lngNum = toNum(form.lng);
   const latInRange = latNum === null || (latNum !== null && !Number.isNaN(latNum) && latNum >= -90 && latNum <= 90);
   const lngInRange = lngNum === null || (lngNum !== null && !Number.isNaN(lngNum) && lngNum >= -180 && lngNum <= 180);
-
   const ubicacionOk =
     (!latProvided && !lngProvided)
     || (latProvided && lngProvided && !Number.isNaN(latNum) && !Number.isNaN(lngNum) && latInRange && lngInRange);
 
-  // Botón: Usar mi ubicación (Geolocation API)
+  // Botón: Usar mi ubicación (Geolocation API) — mantenemos el botón, ocultamos inputs
   const usarMiUbicacion = () => {
     setMensaje('');
     setAccuracy(null);
@@ -234,7 +240,7 @@ export default function EditorTarjeta() {
       titulo: form.titulo.trim(),
       descripcion: form.descripcion.trim(),
       visibilidad: form.visibilidad,
-      videoUrl: sanitizeUrl(form.videoUrl.trim()),
+      // La API ya acepta arrays de strings; pueden ser /api/uploads/... y los normaliza.
       imagenes: (form.imagenes || []).map((s) => s.trim()).filter(Boolean),
       etiquetas: (form.etiquetas || []).filter((t) =>
         OPCIONES_ETIQUETAS.includes((t || '').toLowerCase())
@@ -269,27 +275,38 @@ export default function EditorTarjeta() {
             <div className="card-body">
               <h1 className="h4 mb-3">{id ? 'Editar' : 'Nueva'} tarjeta</h1>
 
-              {mensaje && <div className="alert alert-danger">{mensaje}</div>}
+              {mensaje && (
+                <div className="alert alert-danger" role="alert" aria-live="assertive">
+                  {mensaje}
+                </div>
+              )}
 
               <form onSubmit={enviar} className="row g-3" noValidate>
                 {/* Título */}
                 <div className="col-12">
-                  <label className="form-label">Título</label>
+                  <label className="form-label" htmlFor="campo-titulo">Título <span className="text-danger">*</span></label>
                   <input
+                    id="campo-titulo"
                     className={`form-control ${!form.titulo.trim() ? 'is-invalid' : ''}`}
                     name="titulo"
                     value={form.titulo}
                     onChange={cambiar}
                     maxLength={120}
                     required
+                    aria-invalid={!form.titulo.trim()}
+                    aria-describedby="ayuda-titulo"
                   />
+                  <div id="ayuda-titulo" className="form-text">
+                    Sé claro y descriptivo. Máx. 120 caracteres.
+                  </div>
                   {!form.titulo.trim() && <div className="invalid-feedback">El título es obligatorio.</div>}
                 </div>
 
                 {/* Descripción */}
                 <div className="col-12">
-                  <label className="form-label">Descripción</label>
+                  <label className="form-label" htmlFor="campo-descripcion">Descripción <span className="text-danger">*</span></label>
                   <textarea
+                    id="campo-descripcion"
                     className={`form-control ${!form.descripcion.trim() ? 'is-invalid' : ''}`}
                     rows={4}
                     name="descripcion"
@@ -297,22 +314,28 @@ export default function EditorTarjeta() {
                     onChange={cambiar}
                     maxLength={1000}
                     required
+                    aria-invalid={!form.descripcion.trim()}
+                    aria-describedby="ayuda-descripcion"
                   />
+                  <div id="ayuda-descripcion" className="form-text">
+                    Cuenta qué hace especial este lugar o experiencia. Máx. 1000 caracteres.
+                  </div>
                   {!form.descripcion.trim() && <div className="invalid-feedback">La descripción es obligatoria.</div>}
                 </div>
 
                 {/* Imágenes */}
                 <div className="col-12">
                   <div className="d-flex align-items-center justify-content-between">
-                    <label className="form-label mb-0">Imágenes</label>
+                    <label className="form-label mb-0">Imágenes <span className="text-danger">*</span></label>
                     <div className="d-flex gap-2">
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-secondary"
                         onClick={seleccionarArchivo}
                         disabled={subiendo}
+                        title="Subir imagen"
                       >
-                        {subiendo ? 'Subiendo…' : 'Subir imagen'}
+                        {subiendo ? 'Subiendo…' : 'Añadir imagen'}
                       </button>
                       <input
                         ref={fileRef}
@@ -320,16 +343,18 @@ export default function EditorTarjeta() {
                         accept="image/*"
                         className="d-none"
                         onChange={onFileChange}
+                        aria-label="Seleccionar una imagen para subir"
                       />
                     </div>
                   </div>
 
                   <div className="mt-2 d-flex flex-wrap gap-2">
                     {(form.imagenes || []).map((url, i) => (
-                      <div key={url + i} className="position-relative">
+                      <div key={url + i} className="position-relative" aria-label={`Imagen ${i + 1}`}>
                         <img
+                          // La API ya devuelve una URL lista para <img src>, úsala sin transformaciones
                           src={url}
-                          alt={`img-${i}`}
+                          alt=""
                           style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6 }}
                           loading="lazy"
                           decoding="async"
@@ -339,7 +364,8 @@ export default function EditorTarjeta() {
                           type="button"
                           className="btn btn-sm btn-danger position-absolute top-0 end-0 translate-middle"
                           onClick={() => quitarImagen(i)}
-                          title="Quitar"
+                          title="Quitar imagen"
+                          aria-label={`Quitar imagen ${i + 1}`}
                         >
                           ×
                         </button>
@@ -351,7 +377,8 @@ export default function EditorTarjeta() {
                   )}
                 </div>
 
-                {/* Vídeo (opcional) */}
+                {/* ⛔ VÍDEO OCULTO (conservado) */}
+                {/*
                 <div className="col-12">
                   <label className="form-label">
                     Vídeo (YouTube/Vimeo/MP4) <small className="text-muted">(opcional)</small>
@@ -364,16 +391,19 @@ export default function EditorTarjeta() {
                     placeholder="https://youtu.be/... o https://.../video.mp4"
                   />
                 </div>
+                */}
 
                 {/* Visibilidad */}
                 <div className="col-12 col-md-4">
-                  <label className="form-label">Visibilidad</label>
+                  <label className="form-label" htmlFor="sel-visibilidad">Visibilidad <span className="text-danger">*</span></label>
                   <select
+                    id="sel-visibilidad"
                     className={`form-select ${!['publico', 'privado'].includes(form.visibilidad) ? 'is-invalid' : ''}`}
                     name="visibilidad"
                     value={form.visibilidad}
                     onChange={cambiar}
                     required
+                    aria-invalid={!['publico', 'privado'].includes(form.visibilidad)}
                   >
                     <option value="privado">Privado</option>
                     <option value="publico">Público</option>
@@ -385,73 +415,53 @@ export default function EditorTarjeta() {
 
                 {/* Etiquetas */}
                 <div className="col-12 col-md-8">
-                  <label className="form-label d-block">Etiquetas (elige al menos una)</label>
-                  <div className="d-flex gap-3 flex-wrap">
-                    {OPCIONES_ETIQUETAS.map((tag) => (
-                      <div className="form-check" key={tag}>
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id={`chk-${tag}`}
-                          checked={form.etiquetas.includes(tag)}
-                          onChange={() => toggleEtiqueta(tag)}
-                        />
-                        <label className="form-check-label" htmlFor={`chk-${tag}`}>
-                          {tag}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                  {(form.etiquetas || []).length === 0 && (
-                    <div className="text-danger small mt-1">Selecciona al menos una etiqueta.</div>
-                  )}
+                  <fieldset>
+                    <legend className="form-label mb-2">
+                      Etiquetas <span className="text-danger">*</span>
+                    </legend>
+                    <div className="d-flex gap-3 flex-wrap">
+                      {OPCIONES_ETIQUETAS.map((tag) => (
+                        <div className="form-check" key={tag}>
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`chk-${tag}`}
+                            checked={form.etiquetas.includes(tag)}
+                            onChange={() => toggleEtiqueta(tag)}
+                            aria-describedby="ayuda-etiquetas"
+                          />
+                          <label className="form-check-label" htmlFor={`chk-${tag}`}>
+                            {tag}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <div id="ayuda-etiquetas" className="form-text">
+                      Elige al menos una categoría.
+                    </div>
+                    {(form.etiquetas || []).length === 0 && (
+                      <div className="text-danger small mt-1">Selecciona al menos una etiqueta.</div>
+                    )}
+                  </fieldset>
                 </div>
 
-                {/* Ubicación (opcional) */}
+                {/* Ubicación — dejamos SOLO el botón (inputs lat/lng ocultos) */}
                 <div className="col-12">
                   <div className="d-flex justify-content-between align-items-center">
-                    <label className="form-label mb-1">
-                      Ubicación <small className="text-muted">(opcional)</small>
-                    </label>
+                    <label className="form-label mb-1">Ubicación <small className="text-muted">(opcional)</small></label>
                     <button
                       type="button"
                       className="btn btn-sm btn-outline-success"
                       onClick={usarMiUbicacion}
                       disabled={locating}
                       title="Usar mi ubicación actual"
+                      aria-live="polite"
                     >
-                      {locating ? 'Obteniendo…' : (<><i className="bi bi-geo-alt me-1" /> Usar mi ubicación</>)}
+                      {locating ? 'Obteniendo…' : 'Usar mi ubicación'}
                     </button>
                   </div>
 
-                  <div className="row g-2">
-                    <div className="col-6">
-                      <input
-                        type="number"
-                        step="any"
-                        min={-90}
-                        max={90}
-                        className={`form-control ${latProvided && !ubicacionOk ? 'is-invalid' : ''}`}
-                        name="lat"
-                        value={form.lat}
-                        onChange={cambiar}
-                        placeholder="Latitud (-90 a 90)"
-                      />
-                    </div>
-                    <div className="col-6">
-                      <input
-                        type="number"
-                        step="any"
-                        min={-180}
-                        max={180}
-                        className={`form-control ${lngProvided && !ubicacionOk ? 'is-invalid' : ''}`}
-                        name="lng"
-                        value={form.lng}
-                        onChange={cambiar}
-                        placeholder="Longitud (-180 a 180)"
-                      />
-                    </div>
-                  </div>
+                  {/* Inputs ocultos conservados (ver original) */}
 
                   {accuracy != null && (
                     <div className="form-text">Precisión aprox.: ±{accuracy} m</div>
@@ -467,8 +477,10 @@ export default function EditorTarjeta() {
                 {/* Acciones */}
                 <div className="col-12 d-flex gap-2">
                   <button
+                    type="submit"
                     className="btn btn-primary"
                     disabled={guardando || subiendo || !obligatorioOk || !ubicacionOk}
+                    aria-busy={guardando}
                   >
                     {guardando ? 'Guardando…' : 'Guardar'}
                   </button>
@@ -477,6 +489,7 @@ export default function EditorTarjeta() {
                     className="btn btn-outline-secondary"
                     onClick={() => navigate(-1)}
                     disabled={guardando}
+                    title="Volver atrás"
                   >
                     Cancelar
                   </button>

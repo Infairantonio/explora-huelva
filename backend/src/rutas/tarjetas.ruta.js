@@ -108,9 +108,12 @@ const reglasCrear = [
 ];
 
 // ===== PÚBLICAS (sin token) =====
-router.get('/publicas', ctrl.publicas);
-// Detalle público por ID (solo tarjetas con visibilidad 'publico')
-router.get('/publicas/:id', ctrl.publicaUna);
+ // ===== PÚBLICAS (sin token) =====
++router.get('/', ctrl.publicas);           // ← nuevo: alias para listado público en /api/tarjetas
+ router.get('/publicas', ctrl.publicas);
+ // Detalle público por ID (solo tarjetas con visibilidad 'publico')
+ router.get('/publicas/:id', ctrl.publicaUna);
+
 
 // ===== SUBIDA RÁPIDA DE 1 IMAGEN (privada) =====
 router.post('/subir-imagen', autenticacion, upload.single('file'), ctrl.subirImagen);

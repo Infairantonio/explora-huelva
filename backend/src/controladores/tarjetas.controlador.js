@@ -48,7 +48,7 @@ function baseUploads(req) {
   return `${proto}://${host}/uploads`;
 }
 
-// A partir de req.files (multer.fields), genera URLs públicas
+// A partir de req.files (multer.fields), genera URLs públicas (se usan SOLO para guardado actual)
 function extraerMediaDesdeFiles(req) {
   const base = baseUploads(req);
   const imagenesSubidas = (req.files?.imagenes || []).map((f) => `${base}/${f.filename}`);
@@ -81,6 +81,51 @@ function mapValidationError(err) {
     mensaje: e.message,
   }));
 }
+
+/* ====== NUEVO: helpers de salida para imágenes ====== */
+
+// extrae solo el nombre de archivo de una url/ruta
+const fileNameFrom = (u) => {
+  if (!u) return null;
+  try {
+    const s = String(u);
+    const sinQuery = s.split('?')[0].split('#')[0];
+    const parts = sinQuery.split('/');
+    const name = parts[parts.length - 1];
+    return name || null;
+  } catch {
+    return null;
+  }
+};
+
+// convierte nombre o url a /api/uploads/<filename>
+const toPublicUrl = (nameOrUrl) => {
+  const name = fileNameFrom(nameOrUrl);
+  return name ? `/api/uploads/${name}` : null;
+};
+
+const mapImagenes = (arr) =>
+  Array.isArray(arr) ? arr.map(toPublicUrl).filter(Boolean) : [];
+
+const mapVideo = (v) => {
+  if (!v) return v;
+  // si viene como /uploads/xxx → /api/uploads/xxx
+  if (String(v).startsWith('/uploads/')) return `/api${v}`;
+  // si es absoluta y contiene /uploads/, usa basename
+  if (/\/uploads\//i.test(String(v))) return toPublicUrl(v);
+  // si no parece de /uploads, la dejamos tal cual (p.ej. YouTube)
+  return v;
+};
+
+// serializa doc (Mongoose o POJO) aplicando mapping de imagenes/video
+const serializeTarjeta = (doc) => {
+  const o = doc?.toObject ? doc.toObject() : { ...doc };
+  o.imagenes = mapImagenes(o.imagenes);
+  if (o.imagen) o.imagen = toPublicUrl(o.imagen);        // por si tienes campo legacy
+  if (o.imagenUrl) o.imagenUrl = toPublicUrl(o.imagenUrl); // legacy string única
+  if (o.videoUrl) o.videoUrl = mapVideo(o.videoUrl);
+  return o;
+};
 
 // ---------- Crear ----------
 export async function crear(req, res) {
@@ -125,7 +170,8 @@ export async function crear(req, res) {
       ...(incluirUbicacion ? { lat, lng } : {}),
     });
 
-    return res.status(201).json({ ok: true, tarjeta: doc });
+    // ⇣⇣ respuesta con URLs públicas normalizadas
+    return res.status(201).json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
     if (e?.name === 'ValidationError') {
       return res.status(422).json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
@@ -150,9 +196,11 @@ export async function mias(req, res) {
       Tarjeta.countDocuments(filtro),
     ]);
 
+    const itemsOut = items.map(serializeTarjeta);
+
     return res.json({
       ok: true,
-      items,
+      items: itemsOut,
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
@@ -184,9 +232,11 @@ export async function publicas(req, res) {
       Tarjeta.countDocuments(filtro),
     ]);
 
+    const itemsOut = items.map(serializeTarjeta);
+
     return res.json({
       ok: true,
-      items,
+      items: itemsOut,
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
@@ -208,7 +258,7 @@ export async function publicaUna(req, res) {
       return res.status(404).json({ ok: false, mensaje: 'No encontrada' });
     }
 
-    return res.json({ ok: true, tarjeta: doc });
+    return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
     return res.status(500).json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
   }
@@ -228,7 +278,7 @@ export async function una(req, res) {
       return res.status(403).json({ ok: false, mensaje: 'Sin permiso' });
     }
 
-    return res.json({ ok: true, tarjeta: doc });
+    return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
     return res.status(500).json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
   }
@@ -306,7 +356,7 @@ export async function actualizar(req, res) {
 
   try {
     await doc.save(); // ejecuta validaciones del esquema
-    return res.json({ ok: true, tarjeta: doc });
+    return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
     if (e?.name === 'ValidationError') {
       return res.status(422).json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
@@ -340,13 +390,16 @@ export async function subirImagen(req, res) {
       return res.status(400).json({ ok: false, mensaje: 'No se recibió archivo' });
     }
     const base = baseUploads(req);
-    const url = `${base}/${req.file.filename}`;
+    const filename = req.file.filename;
+    const url = `${base}/${filename}`;
+    const publicUrl = `/api/uploads/${filename}`; // útil directamente para el front
 
     return res.status(201).json({
       ok: true,
       mensaje: 'Imagen subida',
       url,
-      filename: req.file.filename,
+      publicUrl,
+      filename,
       mimetype: req.file.mimetype,
       size: req.file.size,
     });

@@ -11,6 +11,15 @@ import { tarjetasApi } from '../servicios/tarjetas';
 import { logout } from '../utils/auth';
 import TarjetaCard from '../componentes/TarjetaCard.jsx';
 
+// Helper opcional para tomar la primera imagen válida ya lista para <img src="">
+const pickFoto = (t) => {
+  if (!t) return null;
+  const arr = Array.isArray(t.imagenes) ? t.imagenes : [];
+  if (arr.length && typeof arr[0] === 'string') return arr[0]; // p.ej. "/api/uploads/xxx.jpg"
+  if (t.imagenUrl && typeof t.imagenUrl === 'string') return t.imagenUrl; // legacy
+  return null;
+};
+
 export default function Panel() {
   const [items, setItems] = useState([]);
   const [mensaje, setMensaje] = useState('');
@@ -31,7 +40,9 @@ export default function Panel() {
     try {
       // ✅ signal en el 2º argumento (options), no en params
       const r = await tarjetasApi.mias({}, { signal: controller.signal });
-      setItems(Array.isArray(r.items) ? r.items : []);
+      // La API devuelve { ok, items, meta }; items ya trae imagenes como "/api/uploads/..."
+      const arr = Array.isArray(r.items) ? r.items : [];
+      setItems(arr);
     } catch (e) {
       // Ignora aborts intencionales
       if (e?.name === 'AbortError') return;
@@ -117,6 +128,8 @@ export default function Panel() {
                 detalleHref={`/tarjetas/${it._id}`}
                 onEdit={() => navigate(`/panel/editar/${it._id}`)}
                 onDelete={() => eliminar(it._id)}
+                // Si TarjetaCard permite prop 'imagen', puedes pasar pickFoto(it)
+                // imagen={pickFoto(it)}
               />
             </div>
           ))}

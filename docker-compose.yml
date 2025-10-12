@@ -1,4 +1,6 @@
-﻿services:
+﻿version: "3.9"
+
+services:
   mongo:
     image: mongo:7
     container_name: mongo_explora
@@ -23,14 +25,24 @@
       ME_CONFIG_MONGODB_SERVER: mongo
       ME_CONFIG_BASICAUTH: "false"   # en prod ponlo a "true"
     ports:
-      - "${PUERTO_MONGO_EXPRESS}:8081"
+      - "${PUERTO_MONGO_EXPRESS:-8081}:8081"
+    networks: [explora_red]
+
+  # MailHog para ver emails en dev (UI http://localhost:8025)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog_explora
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"   # SMTP
     networks: [explora_red]
 
   api:
     image: node:20-alpine
     container_name: api_explora
     working_dir: /app
-    depends_on: [mongo]
+    depends_on: [mongo, mailhog]
     environment:
       NODE_ENV: development
       PUERTO_INTERNO: 5174
@@ -38,15 +50,21 @@
       CADENA_MONGO: "mongodb://${MONGO_RAIZ_USUARIO}:${MONGO_RAIZ_PASSWORD}@mongo:27017/${MONGO_NOMBRE_BD}?authSource=admin"
       FRONT_ORIGEN: "http://localhost:${PUERTO_WEB},http://127.0.0.1:${PUERTO_WEB}"
       UPLOAD_DIR: /app/uploads
+      # SMTP para dev (MailHog en la red de docker)
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      MAIL_FROM: "Explora Huelva <no-reply@explorahuelva.local>"
+      PUBLIC_URL: "http://localhost:${PUERTO_WEB}"
     command: >
       sh -lc "if [ ! -x node_modules/.bin/nodemon ];
       then npm ci --silent || npm install --silent; fi; npm run dev"
     volumes:
       - ./backend:/app
       - api_node_modules:/app/node_modules
-      - ./uploads:/app/uploads
+      # 👇 NO hace falta montar ./uploads porque /app ya apunta a ./backend
+      # - ./backend/uploads:/app/uploads
     ports:
-      - "${PUERTO_API}:5174"
+      - "${PUERTO_API:-5174}:5174"
     networks: [explora_red]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5174/api/salud"]
@@ -69,7 +87,7 @@
       - ./frontend:/app
       - web_node_modules:/app/node_modules
     ports:
-      - "${PUERTO_WEB}:5173"
+      - "${PUERTO_WEB:-5173}:5173"
     networks: [explora_red]
     depends_on:
       - api

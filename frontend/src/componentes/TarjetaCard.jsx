@@ -82,7 +82,9 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
     ? item.imagenes
     : (item?.imagenUrl ? [item.imagenUrl] : []);
 
-  const portada = sanitizeUrl(imagenes[0] || '');
+  // ✅ La API ya devuelve rutas listas (p.ej. "/api/uploads/xxx.jpg")
+  const portada = imagenes[0] || null;
+
   const embed = toEmbedUrl(item?.videoUrl);
   const videoUrl = sanitizeUrl(item?.videoUrl);
   const esMp4 = typeof videoUrl === 'string' && videoUrl.toLowerCase().endsWith('.mp4');
@@ -160,12 +162,11 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
         {imagenes.length > 1 && (
           <div className="d-flex gap-2 mt-3 flex-wrap">
             {imagenes.slice(1, 5).map((src, i) => {
-              const safe = sanitizeUrl(src);
-              if (!safe) return null;
+              if (!src) return null;
               return (
                 <img
-                  key={`${safe}-${i}`}
-                  src={safe}
+                  key={`${src}-${i}`}
+                  src={src}
                   alt={`${item?.titulo || 'imagen'} ${i + 2}`}
                   style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }}
                   loading="lazy"

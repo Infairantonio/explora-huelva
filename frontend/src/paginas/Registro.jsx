@@ -15,15 +15,27 @@ export default function Registro() {
     e.preventDefault();
     if (cargando) return;
     setMensaje(""); setCargando(true);
-    try {
-      const data = await register({ nombre, email, password }); // guarda token
-      if (data?.ok) navigate("/panel", { replace: true });
-      else throw new Error("No se pudo registrar");
-    } catch (err) {
-      setMensaje("❌ " + (err?.message || "Error al registrar"));
-    } finally {
-      setCargando(false);
-    }
+   try {
+  const data = await register({ nombre, email, password }); // NO debe guardar token
+  if (data?.ok && data?.necesitaVerificar) {
+    // manda a la pantalla de verificación con el email
+    navigate(`/verifica?enviado=1&email=${encodeURIComponent(email)}`, { replace: true });
+  } else if (data?.ok && data?.token) {
+    // fallback por si en algún entorno sigues emitiendo token en el registro
+    navigate("/panel", { replace: true });
+  } else {
+    throw new Error("No se pudo completar el registro");
+  }
+} catch (err) {
+  const detalle =
+    err?.payload?.mensaje ||
+    (Array.isArray(err?.payload?.errores) && err.payload.errores[0]?.msg) ||
+    err?.message || "Error al registrar";
+  setMensaje("❌ " + detalle);
+} finally {
+  setCargando(false);
+}
+
   };
 
   return (
@@ -40,10 +52,16 @@ export default function Registro() {
               {mensaje && <div className="alert alert-info">{mensaje}</div>}
               <form onSubmit={enviar} noValidate>
                 <div className="mb-3">
-                  <label className="form-label">Nombre</label>
-                  <input className="form-control" value={nombre}
-                         onChange={(e)=>setNombre(e.target.value)} required />
-                </div>
+  <label className="form-label">Nombre</label>
+  <input
+    className="form-control"
+    value={nombre}
+    onChange={(e) => setNombre(e.target.value)}
+    required
+    minLength={2}  // igual que la validación del backend
+  />
+</div>
+
                 <div className="mb-3">
                   <label className="form-label">Email</label>
                   <input className="form-control" type="email" value={email}

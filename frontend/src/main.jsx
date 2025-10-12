@@ -15,13 +15,18 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App.jsx";
 import Inicio from "./paginas/Inicio.jsx";
 import Login from "./paginas/Login.jsx";
-import Registro from "./paginas/Registro.jsx"; // ← si tienes la pantalla de registro
+import Registro from "./paginas/Registro.jsx";
 import Panel from "./paginas/Panel.jsx";
 import EditorTarjeta from "./paginas/EditorTarjeta.jsx";
 import RutaPrivada from "./componentes/RutaProtegida.jsx";
 import TarjetaPublica from "./paginas/TarjetaPublica.jsx";
-import Lugares from "./paginas/Lugares.jsx"; // ← Listado público por etiqueta
-import AdminTarjetas from "./paginas/AdminTarjetas.jsx"; // ← NUEVO: panel admin
+import Lugares from "./paginas/Lugares.jsx";
+import AdminTarjetas from "./paginas/AdminTarjetas.jsx";
+
+// 🔹 Nuevas páginas de autenticación avanzada
+import Verifica from "./paginas/Verifica.jsx";
+import Olvide from "./paginas/Olvide.jsx";
+import Reset from "./paginas/Reset.jsx";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -35,15 +40,18 @@ createRoot(document.getElementById("root")).render(
           <Route path="registro" element={<Registro />} />
           <Route path="tarjetas/:id" element={<TarjetaPublica />} />
 
-          {/* EXPLORAR por etiqueta */}
-          <Route path="explorar/:etiqueta" element={<Lugares />} />
+          {/* 🔹 Nuevas rutas de autenticación */}
+          <Route path="verifica" element={<Verifica />} />
+          <Route path="olvide" element={<Olvide />} />
+          <Route path="reset" element={<Reset />} />
 
-          {/* Alias/atajos que redirigen al path con parámetro */}
+          {/* EXPLORAR */}
+          <Route path="explorar/:etiqueta" element={<Lugares />} />
           <Route path="lugares" element={<Navigate to="/explorar/lugares" replace />} />
           <Route path="experiencias" element={<Navigate to="/explorar/experiencias" replace />} />
           <Route path="rutas" element={<Navigate to="/explorar/rutas" replace />} />
 
-          {/* Privadas (requiere token) */}
+          {/* Privadas */}
           <Route
             path="panel"
             element={
@@ -69,7 +77,7 @@ createRoot(document.getElementById("root")).render(
             }
           />
 
-          {/* Admin (requiere token; el backend valida rol=admin) */}
+          {/* Admin */}
           <Route
             path="admin/tarjetas"
             element={
