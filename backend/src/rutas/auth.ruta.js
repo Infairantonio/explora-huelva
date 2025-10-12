@@ -1,18 +1,26 @@
 // backend/src/rutas/auth.ruta.js
 // ————————————————————————————————————————————————————
-// Rutas de autenticación: registro, login y perfil.
-// Mantiene contrato actual y valida inputs.
+// Rutas de autenticación: registro, login, refresh, verificación y reset.
 // ————————————————————————————————————————————————————
-
 import { Router } from 'express';
-import { body, validationResult } from 'express-validator';
-import * as auth from '../controladores/auth.controlador.js';
-// OJO: ajusta este import a tu carpeta real: 'middleware' vs 'middlewares'
+import { body, query, validationResult } from 'express-validator';
+import {
+  registrar,
+  iniciarSesion,
+  refrescar,
+  cerrarSesion,
+  cerrarSesiones,
+  perfil,
+  verificarEmail,
+  reenviarVerificacion,
+  olvidePassword,
+  resetPassword,
+} from '../controladores/auth.controlador.js';
 import autenticacion from '../middleware/autenticacion.js';
 
 const router = Router();
 
-// ——— Utilidad local: manejador de resultados de validación ———
+// Validación genérica
 const validar = (req, res, next) => {
   const errores = validationResult(req);
   if (!errores.isEmpty()) {
@@ -21,17 +29,16 @@ const validar = (req, res, next) => {
   next();
 };
 
-// ——— Sanitizadores seguros ———
+// Reglas
 const toTrimLower = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v);
 
-// ——— Reglas de validación ———
 const reglaNombre = body('nombre')
   .isString().withMessage('Nombre inválido')
   .trim()
   .isLength({ min: 2, max: 80 }).withMessage('El nombre debe tener 2-80 caracteres');
 
 const reglaEmail = body('email')
-  .customSanitizer(toTrimLower) // Evita normalizaciones agresivas de Gmail/Yahoo
+  .customSanitizer(toTrimLower)
   .isEmail().withMessage('Email no válido');
 
 const reglaPasswordRegistro = body('password')
@@ -40,11 +47,39 @@ const reglaPasswordRegistro = body('password')
 const reglaPasswordLogin = body('password')
   .isLength({ min: 1 }).withMessage('La contraseña es obligatoria');
 
-// ——— Endpoints ———
-router.post('/registrar', [reglaNombre, reglaEmail, reglaPasswordRegistro, validar], auth.registrar);
+const reglaRemember = body('remember')
+  .optional()
+  .isBoolean().withMessage('remember debe ser booleano')
+  .toBoolean();
 
-router.post('/login', [reglaEmail, reglaPasswordLogin, validar], auth.iniciarSesion);
+// ——— Endpoints principales ———
+router.post('/registrar', [reglaNombre, reglaEmail, reglaPasswordRegistro, validar], registrar);
+router.post('/login', [reglaEmail, reglaPasswordLogin, reglaRemember, validar], iniciarSesion);
+router.post('/refresh', refrescar);
+router.post('/logout', cerrarSesion);
+router.post('/logout-all', autenticacion, cerrarSesiones);
+router.get('/perfil', autenticacion, perfil);
 
-router.get('/perfil', autenticacion, auth.perfil);
+// ——— Verificación y recuperación ———
+router.get(
+  '/verificar-email',
+  [query('token').isString().isLength({ min: 10 }).withMessage('Token inválido')],
+  validar,
+  verificarEmail
+);
+
+router.post('/reenviar-verificacion', [reglaEmail, validar], reenviarVerificacion);
+
+router.post('/olvide', [reglaEmail, validar], olvidePassword);
+
+router.post(
+  '/reset',
+  [
+    body('token').isString().isLength({ min: 10 }),
+    body('newPassword').isLength({ min: 6 }),
+    validar,
+  ],
+  resetPassword
+);
 
 export default router;

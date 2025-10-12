@@ -2,6 +2,7 @@
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import { urlImagen } from '../servicios/api';
 
 /** Solo permite http/https; evita esquemas raros (javascript:, data:, file:, etc.) */
 function sanitizeUrl(url = '') {
@@ -82,7 +83,8 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
     ? item.imagenes
     : (item?.imagenUrl ? [item.imagenUrl] : []);
 
-  const portada = sanitizeUrl(imagenes[0] || '');
+  // Para imágenes usamos urlImagen(), que normaliza rutas relativas a /api/uploads/...
+  const portada = urlImagen(imagenes[0] || '');
   const embed = toEmbedUrl(item?.videoUrl);
   const videoUrl = sanitizeUrl(item?.videoUrl);
   const esMp4 = typeof videoUrl === 'string' && videoUrl.toLowerCase().endsWith('.mp4');
@@ -160,12 +162,12 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
         {imagenes.length > 1 && (
           <div className="d-flex gap-2 mt-3 flex-wrap">
             {imagenes.slice(1, 5).map((src, i) => {
-              const safe = sanitizeUrl(src);
-              if (!safe) return null;
+              const normalized = urlImagen(src);
+              if (!normalized) return null;
               return (
                 <img
-                  key={`${safe}-${i}`}
-                  src={safe}
+                  key={`${normalized}-${i}`}
+                  src={normalized}
                   alt={`${item?.titulo || 'imagen'} ${i + 2}`}
                   style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }}
                   loading="lazy"

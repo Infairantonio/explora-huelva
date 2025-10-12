@@ -5,8 +5,9 @@ import { login, getPerfil } from "../servicios/api";
 import { soyAdmin } from "../servicios/adminTarjetas";
 
 export default function Login() {
-  const [email, setEmail] = useState("");      // ← corregido
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
 
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState("");
@@ -18,26 +19,24 @@ export default function Login() {
   const next = params.get("next") || "/panel";
   const fromState = location.state?.from?.pathname;
 
-  // Decide a dónde enviar tras validar sesión según permisos
   const irSegunPermisos = async () => {
     try {
-      const esAdmin = await soyAdmin(); // consulta /api/admin/tarjetas con el token
+      const esAdmin = await soyAdmin();
       if (esAdmin) {
         navigate("/admin/tarjetas", { replace: true });
       } else {
         navigate(fromState || next, { replace: true });
       }
     } catch {
-      // ante fallo de red, seguimos el flujo normal
       navigate(fromState || next, { replace: true });
     }
   };
 
-  // Si ya hay token válido, saltamos el login directamente
+  // Si ya hay sesión válida, entrar directamente
   useEffect(() => {
     (async () => {
       try {
-        const me = await getPerfil(); // lanza si no autorizado
+        const me = await getPerfil();
         if (me?.ok) await irSegunPermisos();
       } catch {
         /* no autorizado */
@@ -46,6 +45,15 @@ export default function Login() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ Mostrar avisos cuando venimos de reset/verificación
+  useEffect(() => {
+    if (params.get("reset") === "ok") {
+      setMensaje("✅ Contraseña restablecida correctamente. Inicia sesión.");
+    } else if (params.get("verifica") === "ok") {
+      setMensaje("✅ Email verificado. Ya puedes iniciar sesión.");
+    }
+  }, [params]);
+
   const enviar = async (e) => {
     e.preventDefault();
     if (cargando) return;
@@ -53,11 +61,16 @@ export default function Login() {
     setMensaje("");
     setCargando(true);
     try {
-      const data = await login({ email, password }); // guarda token
+      const data = await login({ email, password, remember });
       if (!data?.ok) throw new Error("Credenciales incorrectas");
       await irSegunPermisos();
     } catch (err) {
-      const msg = err?.message || "Error al iniciar sesión";
+      const raw = err?.message || "";
+      let msg = raw || "Error al iniciar sesión";
+      if (/403/.test(raw) || /verific/i.test(raw))
+        msg = "Tu email no está verificado. Revisa tu correo o solicita un nuevo enlace.";
+      else if (/401/.test(raw))
+        msg = "Credenciales inválidas. Revisa tu email y contraseña.";
       setMensaje("❌ " + msg);
     } finally {
       setCargando(false);
@@ -68,13 +81,11 @@ export default function Login() {
     <div className="auth-wrap">
       <div className="container">
         <div className="auth-layout">
-          {/* Izquierda: copy/branding */}
           <div className="auth-copy">
             <h2>Explora Huelva</h2>
             <p>Descubre rutas y experiencias cerca de ti.</p>
           </div>
 
-          {/* Derecha: tarjeta/formulario */}
           <div className="card auth-card shadow border-0 ms-auto">
             <div className="card-body">
               <h1 className="card-title fw-bold text-primary mb-3">Iniciar sesión</h1>
@@ -110,6 +121,19 @@ export default function Login() {
                   />
                 </div>
 
+                <div className="form-check mb-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="remember"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor="remember">
+                    Recordarme en este dispositivo
+                  </label>
+                </div>
+
                 <div className="d-flex align-items-center gap-2">
                   <button
                     type="submit"
@@ -120,6 +144,12 @@ export default function Login() {
                   </button>
                   <Link to="/registro" className="btn btn-outline-primary">Crear cuenta</Link>
                   <Link to="/" className="btn btn-link">Volver</Link>
+                </div>
+
+                <div className="mt-3">
+                  <Link to="/olvide" className="small">
+                    ¿Has olvidado tu contraseña o no te llegó la verificación?
+                  </Link>
                 </div>
               </form>
             </div>

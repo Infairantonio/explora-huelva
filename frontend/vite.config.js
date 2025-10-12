@@ -1,20 +1,24 @@
-// vite.config.js
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+// frontend/vite.config.js
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
     port: 5173,
-    strictPort: true,
-    watch: { usePolling: true, interval: 200 },
-    hmr: { clientPort: 5173 },
     proxy: {
-      '/api': {
-        target: 'http://localhost:5174',
+      "/api": {
+        target: "http://api:5174",
         changeOrigin: true,
+        secure: false,
+      },
+      // 👇 añade esto
+      "/uploads": {
+        target: "http://api:5174",
+        changeOrigin: true,
+        secure: false,
       },
     },
   },
-})
+});

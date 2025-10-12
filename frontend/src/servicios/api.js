@@ -9,6 +9,17 @@ export const API_URL = RAW_API_URL.replace(/\/+$/, '');
 
 const TOKEN_KEY = 'token';
 
+// ——— NUEVO: helper para construir URLs de imágenes ———
+// Uso: <img src={urlImagen(item.imagen)} />
+export const urlImagen = (nombreArchivo = '') => {
+  if (!nombreArchivo) return '';
+  // Si ya viene absoluta (S3, CDN, etc.), respétala
+  if (/^https?:\/\//i.test(nombreArchivo)) return nombreArchivo;
+  // Evita dobles barras
+  const limpio = String(nombreArchivo).replace(/^\/+/, '');
+  return `${API_URL}/uploads/${limpio}`;
+};
+
 // ——— Token helpers ———
 export const getToken = () => {
   try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
@@ -91,7 +102,7 @@ export async function register({ nombre, email, password }) {
     body: JSON.stringify({ nombre, email, password })
   });
   const data = await parseAndThrowIfNotOk(res);
-  if (data?.token) setToken(data.token); // auto-login tras registro
+ // if (data?.token) setToken(data.token); // auto-login tras registro
   return data;
 }
 
@@ -101,8 +112,24 @@ export async function getPerfil() {
   return parseAndThrowIfNotOk(res);
 }
 
-// ——— Ejemplo de uso genérico con authFetch ———
-// export async function getMisTarjetas() {
-//   const res = await authFetch(`${API_URL}/tarjetas/mias`);
-//   return parseAndThrowIfNotOk(res);
-// }
+// ——— Recuperación de contraseña ———
+
+// Solicita el email con el enlace de "Olvidé mi contraseña"
+export async function solicitarResetPassword(email) {
+  const res = await fetch(`${API_URL}/auth/olvide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  return parseAndThrowIfNotOk(res); // { ok: true }
+}
+
+// Envía el token y la nueva contraseña al backend
+export async function resetPassword({ token, newPassword }) {
+  const res = await fetch(`${API_URL}/auth/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword })
+  });
+  return parseAndThrowIfNotOk(res); // { ok: true, mensaje: "Contraseña actualizada" }
+}
