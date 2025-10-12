@@ -40,6 +40,9 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   console.log("📁 Creada carpeta de subidas:", UPLOAD_DIR);
 }
 app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "1h" }));
+// Alias para quienes piden /api/uploads desde el frontend (proxy /api)
+app.use("/api/uploads", express.static(UPLOAD_DIR, { maxAge: "1h" }));
+
 
 // Pequeñas hardening
 app.disable("x-powered-by");

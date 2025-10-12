@@ -1,9 +1,11 @@
+// src/paginas/EditorTarjeta.jsx
 // Pantalla para crear o editar una tarjeta (vídeo y lat/lng ocultos por ahora, conservando código comentado)
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { tarjetasApi } from '../servicios/tarjetas';
-import { urlImagen } from '../servicios/api';
+// ❌ ya no necesitamos transformar URLs aquí: la API devuelve /api/uploads/...
+// import { urlImagen } from '../servicios/api';
 import { logout } from '../utils/auth';
 
 const OPCIONES_ETIQUETAS = ['lugares', 'experiencias', 'rutas'];
@@ -71,6 +73,7 @@ export default function EditorTarjeta() {
       setForm({
         titulo: t.titulo || '',
         descripcion: t.descripcion || '',
+        // La API ya normaliza a "/api/uploads/...", úsalo tal cual
         imagenes: Array.isArray(t.imagenes) ? t.imagenes : (t.imagenUrl ? [t.imagenUrl] : []),
         videoUrl: t.videoUrl || '',
         visibilidad: t.visibilidad || 'privado',
@@ -126,9 +129,13 @@ export default function EditorTarjeta() {
     try {
       setSubiendo(true);
       const r = await tarjetasApi.subirImagen(f, { signal: controller.signal });
+      // ⬇️ La API ahora devuelve { publicUrl, filename, url }. Para el front usamos publicUrl.
+      const nueva = r.publicUrl || r.url; // fallback por si no actualizaste aún el backend
+      if (!nueva) throw new Error('Respuesta inesperada al subir imagen');
+
       // Añadir URL evitando duplicados
       setForm((prev) => {
-        const set = new Set([...(prev.imagenes || []), r.url].filter(Boolean));
+        const set = new Set([...(prev.imagenes || []), nueva].filter(Boolean));
         return { ...prev, imagenes: Array.from(set) };
       });
     } catch (e2) {
@@ -233,6 +240,7 @@ export default function EditorTarjeta() {
       titulo: form.titulo.trim(),
       descripcion: form.descripcion.trim(),
       visibilidad: form.visibilidad,
+      // La API ya acepta arrays de strings; pueden ser /api/uploads/... y los normaliza.
       imagenes: (form.imagenes || []).map((s) => s.trim()).filter(Boolean),
       etiquetas: (form.etiquetas || []).filter((t) =>
         OPCIONES_ETIQUETAS.includes((t || '').toLowerCase())
@@ -341,10 +349,11 @@ export default function EditorTarjeta() {
                   </div>
 
                   <div className="mt-2 d-flex flex-wrap gap-2">
-                    {(form.imagenes || []).map((u, i) => (
-                      <div key={u + i} className="position-relative" aria-label={`Imagen ${i + 1}`}>
+                    {(form.imagenes || []).map((url, i) => (
+                      <div key={url + i} className="position-relative" aria-label={`Imagen ${i + 1}`}>
                         <img
-                          src={urlImagen(u)}
+                          // La API ya devuelve una URL lista para <img src>, úsala sin transformaciones
+                          src={url}
                           alt=""
                           style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6 }}
                           loading="lazy"
@@ -369,7 +378,20 @@ export default function EditorTarjeta() {
                 </div>
 
                 {/* ⛔ VÍDEO OCULTO (conservado) */}
-                {/* ... */}
+                {/*
+                <div className="col-12">
+                  <label className="form-label">
+                    Vídeo (YouTube/Vimeo/MP4) <small className="text-muted">(opcional)</small>
+                  </label>
+                  <input
+                    className="form-control"
+                    name="videoUrl"
+                    value={form.videoUrl}
+                    onChange={cambiar}
+                    placeholder="https://youtu.be/... o https://.../video.mp4"
+                  />
+                </div>
+                */}
 
                 {/* Visibilidad */}
                 <div className="col-12 col-md-4">
@@ -423,7 +445,7 @@ export default function EditorTarjeta() {
                   </fieldset>
                 </div>
 
-                {/* Ubicación — botón solo */}
+                {/* Ubicación — dejamos SOLO el botón (inputs lat/lng ocultos) */}
                 <div className="col-12">
                   <div className="d-flex justify-content-between align-items-center">
                     <label className="form-label mb-1">Ubicación <small className="text-muted">(opcional)</small></label>
@@ -438,6 +460,8 @@ export default function EditorTarjeta() {
                       {locating ? 'Obteniendo…' : 'Usar mi ubicación'}
                     </button>
                   </div>
+
+                  {/* Inputs ocultos conservados (ver original) */}
 
                   {accuracy != null && (
                     <div className="form-text">Precisión aprox.: ±{accuracy} m</div>
