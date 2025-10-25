@@ -16,6 +16,7 @@ import {
   olvidePassword,
   resetPassword,
 } from '../controladores/auth.controlador.js';
+// ⬅️ asegúrate de que el archivo está en "middlewares"
 import autenticacion from '../middleware/autenticacion.js';
 
 const router = Router();

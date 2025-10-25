@@ -14,6 +14,9 @@ const { Schema } = mongoose;
 // Lista única de etiquetas válidas (fuente de verdad)
 export const ETIQUETAS_PERMITIDAS = ['lugares', 'experiencias', 'rutas'];
 
+// NUEVO: lista de visibilidades permitidas, añadimos 'amigos'
+export const VISIBILIDADES_PERMITIDAS = ['publico', 'privado', 'amigos'];
+
 // Acepta URLs http(s) o rutas relativas del propio servidor (/uploads/...)
 const URL_OK = /^(https?:\/\/|\/)/i;
 
@@ -93,7 +96,7 @@ const TarjetaSchema = new Schema(
     // ——— Visibilidad y etiquetas ———
     visibilidad: {
       type: String,
-      enum: ['publico', 'privado'],
+      enum: VISIBILIDADES_PERMITIDAS, // ← ahora soporta 'amigos'
       required: true,
       default: 'privado',
       index: true,

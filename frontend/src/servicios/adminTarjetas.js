@@ -31,6 +31,7 @@ const qs = (obj = {}) => {
 };
 
 export const adminTarjetas = {
+  // Listado de tarjetas con filtros (page, limit, q, etiqueta, visibilidad, eliminado, etc.)
   async listar(params = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas${qs(params)}`, {
       headers: { ...auth() },
@@ -39,6 +40,7 @@ export const adminTarjetas = {
     return handle(r);
   },
 
+  // Detalle de una tarjeta (para moderación)
   async detalle(id) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
       headers: { ...auth() },
@@ -47,6 +49,7 @@ export const adminTarjetas = {
     return handle(r);
   },
 
+  // Soft delete con motivo
   async eliminar(id, motivo) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
       method: 'DELETE',
@@ -56,6 +59,7 @@ export const adminTarjetas = {
     return handle(r);
   },
 
+  // Restaurar una tarjeta previamente eliminada
   async restaurar(id) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}/restaurar`, {
       method: 'POST',
@@ -63,21 +67,20 @@ export const adminTarjetas = {
     });
     return handle(r);
   },
-
-  
 };
 
+// Comprobación rápida: ¿el token actual tiene acceso a /admin?
 export async function soyAdmin() {
   const t = getToken();
   if (!t) return false;
   try {
-    const r = await fetch(`${API_URL}/admin/tarjetas?page=1&pageSize=1`, {
+    // El backend acepta page/limit (y también pageSize por compat)
+    const r = await fetch(`${API_URL}/admin/tarjetas?page=1&limit=1`, {
       headers: { ...auth() },
-      cache: "no-store",
+      cache: 'no-store',
     });
     return r.status === 200;
   } catch {
     return false;
   }
 }
-

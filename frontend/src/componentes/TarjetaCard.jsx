@@ -1,4 +1,3 @@
-// src/componentes/TarjetaCard.jsx
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -91,8 +90,14 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
 
   const vis = (item?.visibilidad || '').toLowerCase();
   const esPublica = vis === 'publico';
-  const visTexto = esPublica ? 'Público' : vis === 'privado' ? 'Privado' : '—';
-  const visClass = esPublica ? 'bg-success' : vis === 'privado' ? 'bg-secondary' : 'bg-light text-dark';
+  const visTexto =
+    vis === 'publico' ? 'Público' :
+    vis === 'privado' ? 'Privado' :
+    vis === 'amigos' ? 'Amigos' : '—';
+  const visClass =
+    vis === 'publico' ? 'bg-success' :
+    vis === 'privado' ? 'bg-secondary' :
+    vis === 'amigos' ? 'bg-primary' : 'bg-light text-dark';
 
   // URL de "Cómo llegar" si hay coordenadas válidas
   const mapsUrl = buildMapsUrl(item?.lat, item?.lng);
@@ -199,7 +204,9 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
             </a>
           )}
 
-          {/* Ver detalle (solo si pública y tenemos ruta) */}
+          {/* Ver detalle
+              Nota: por ahora mantenemos el botón solo para 'publico'.
+              Cuando el backend permita detalle a amigos, podemos habilitarlo para 'amigos'. */}
           {esPublica && detalleHref && (
             abrirEnNuevaPestana ? (
               <a
@@ -239,7 +246,7 @@ TarjetaCard.propTypes = {
     _id: PropTypes.string,
     titulo: PropTypes.string,
     descripcion: PropTypes.string,
-    visibilidad: PropTypes.string, // 'publico' | 'privado'
+    visibilidad: PropTypes.string, // 'publico' | 'privado' | 'amigos'
     etiquetas: PropTypes.arrayOf(PropTypes.string),
     imagenes: PropTypes.arrayOf(PropTypes.string),
     imagenUrl: PropTypes.string,     // compat

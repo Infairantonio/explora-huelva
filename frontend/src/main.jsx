@@ -23,10 +23,19 @@ import TarjetaPublica from "./paginas/TarjetaPublica.jsx";
 import Lugares from "./paginas/Lugares.jsx";
 import AdminTarjetas from "./paginas/AdminTarjetas.jsx";
 
-// 🔹 Nuevas páginas de autenticación avanzada
+// 🔹 Autenticación avanzada
 import Verifica from "./paginas/Verifica.jsx";
 import Olvide from "./paginas/Olvide.jsx";
 import Reset from "./paginas/Reset.jsx";
+
+// 🔹 Amigos
+import Amigos from "./paginas/Amigos.jsx";
+
+// 🔹 NUEVO: Blog (estático)
+import Blog from "./paginas/Blog.jsx";
+
+// 🔹 (Si aún no lo tenías) Sobre nosotros
+import SobreNosotros from "./paginas/SobreNosotros.jsx";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -39,8 +48,10 @@ createRoot(document.getElementById("root")).render(
           <Route path="login" element={<Login />} />
           <Route path="registro" element={<Registro />} />
           <Route path="tarjetas/:id" element={<TarjetaPublica />} />
+          <Route path="sobre" element={<SobreNosotros />} />
+          <Route path="blog" element={<Blog />} />
 
-          {/* 🔹 Nuevas rutas de autenticación */}
+          {/* Auth avanzada */}
           <Route path="verifica" element={<Verifica />} />
           <Route path="olvide" element={<Olvide />} />
           <Route path="reset" element={<Reset />} />
@@ -57,6 +68,14 @@ createRoot(document.getElementById("root")).render(
             element={
               <RutaPrivada>
                 <Panel />
+              </RutaPrivada>
+            }
+          />
+          <Route
+            path="panel/amigos"
+            element={
+              <RutaPrivada>
+                <Amigos />
               </RutaPrivada>
             }
           />

@@ -9,15 +9,18 @@ import { logout } from "../utils/auth";
 export default function AdminTarjetas() {
   const navigate = useNavigate();
   const [estado, setEstado] = useState({ cargando: true, error: "", items: [], total: 0 });
+
+  // ⬇️ Cambios: usamos "limit" (no pageSize) y añadimos "amigos" como visibilidad
   const [f, setF] = useState({
     q: "",
     et: "",
     vis: "",
     incDel: true,
     page: 1,
-    pageSize: 25,
+    limit: 25,
     orden: "-createdAt",
   });
+
   const aborter = useRef(null);
 
   const cargar = async (params = f) => {
@@ -26,8 +29,16 @@ export default function AdminTarjetas() {
     const ctrl = new AbortController();
     aborter.current = ctrl;
     try {
-      const r = await adminTarjetas.listar({ ...params, incDel: params.incDel ? 1 : 0 });
-      setEstado({ cargando: false, error: "", items: r.items || [], total: r.total || 0 });
+      const r = await adminTarjetas.listar({
+        ...params,
+        incDel: params.incDel ? 1 : 0,
+      });
+      setEstado({
+        cargando: false,
+        error: "",
+        items: r.items || [],
+        total: r.total || 0,
+      });
     } catch (e) {
       if (e?.name === "AbortError") return;
       if (e?.status === 401) {
@@ -36,10 +47,20 @@ export default function AdminTarjetas() {
         return;
       }
       if (e?.status === 403) {
-        setEstado({ cargando: false, error: "No tienes permisos de administrador.", items: [], total: 0 });
+        setEstado({
+          cargando: false,
+          error: "No tienes permisos de administrador.",
+          items: [],
+          total: 0,
+        });
         return;
       }
-      setEstado({ cargando: false, error: e?.message || "Error al cargar", items: [], total: 0 });
+      setEstado({
+        cargando: false,
+        error: e?.message || "Error al cargar",
+        items: [],
+        total: 0,
+      });
     }
   };
 
@@ -57,8 +78,8 @@ export default function AdminTarjetas() {
   };
 
   const paginas = useMemo(
-    () => Math.max(1, Math.ceil((estado.total || 0) / (f.pageSize || 25))),
-    [estado.total, f.pageSize]
+    () => Math.max(1, Math.ceil((estado.total || 0) / (f.limit || 25))),
+    [estado.total, f.limit]
   );
 
   const irPagina = (n) => {
@@ -87,6 +108,15 @@ export default function AdminTarjetas() {
     }
   };
 
+  // Badge para visibilidad (incluye 'amigos')
+  const VisBadge = ({ vis }) => {
+    const v = String(vis || "").toLowerCase();
+    if (v === "publico") return <span className="badge bg-success">Público</span>;
+    if (v === "amigos") return <span className="badge bg-info text-dark">Amigos</span>;
+    if (v === "privado") return <span className="badge bg-secondary">Privado</span>;
+    return <span className="badge bg-light text-dark">{vis || "—"}</span>;
+  };
+
   return (
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -105,6 +135,7 @@ export default function AdminTarjetas() {
               placeholder="título o descripción"
             />
           </div>
+
           <div className="col-6 col-md-2">
             <label className="form-label">Etiqueta</label>
             <select
@@ -118,6 +149,7 @@ export default function AdminTarjetas() {
               <option value="rutas">Rutas</option>
             </select>
           </div>
+
           <div className="col-6 col-md-2">
             <label className="form-label">Visibilidad</label>
             <select
@@ -127,14 +159,16 @@ export default function AdminTarjetas() {
             >
               <option value="">(todas)</option>
               <option value="publico">Público</option>
+              <option value="amigos">Amigos</option>
               <option value="privado">Privado</option>
             </select>
           </div>
+
           <div className="col-6 col-md-2">
             <label className="form-label">Tamaño página</label>
             <select
-              value={f.pageSize}
-              onChange={(e) => setF({ ...f, pageSize: Number(e.target.value) })}
+              value={f.limit}
+              onChange={(e) => setF({ ...f, limit: Number(e.target.value), page: 1 })}
               className="form-select"
             >
               {[10, 25, 50, 100].map((n) => (
@@ -144,6 +178,7 @@ export default function AdminTarjetas() {
               ))}
             </select>
           </div>
+
           <div className="col-6 col-md-2 form-check mt-4">
             <input
               id="incDel"
@@ -156,6 +191,7 @@ export default function AdminTarjetas() {
               Incluir eliminadas
             </label>
           </div>
+
           <div className="col-12 col-md-2 ms-auto">
             <button className="btn btn-primary w-100" disabled={estado.cargando} type="submit">
               {estado.cargando ? "Cargando…" : "Filtrar"}
@@ -200,7 +236,7 @@ export default function AdminTarjetas() {
                     {it.usuario?.nombre || ""}
                     <div className="text-muted small">{it.usuario?.email || ""}</div>
                   </td>
-                  <td>{it.visibilidad}</td>
+                  <td><VisBadge vis={it.visibilidad} /></td>
                   <td>{(it.etiquetas || []).join(", ")}</td>
                   <td>
                     {it.eliminado ? (
@@ -230,6 +266,7 @@ export default function AdminTarjetas() {
                       <button
                         className="btn btn-sm btn-outline-secondary"
                         onClick={() => window.open(`/tarjetas/${it._id}`, "_blank")}
+                        title="Ver detalle público"
                       >
                         Ver
                       </button>

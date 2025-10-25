@@ -1,4 +1,3 @@
-// src/servicios/tarjetas.js
 import { API_URL, getToken } from './api';
 
 // Header Authorization (si hay token)
@@ -51,7 +50,17 @@ export const tarjetasApi = {
     return handle(r);
   },
 
-  // === privadas
+  // === feed de amigos (requiere token)
+  async amigos(params = {}, options = {}) {
+    const r = await fetch(`${API_URL}/tarjetas/amigos${qs(params)}`, {
+      ...options,
+      headers: { ...authHeader(), ...(options.headers || {}) },
+      cache: 'no-store',
+    });
+    return handle(r);
+  },
+
+  // === privadas (mías)
   async mias(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas/mias${qs(params)}`, {
       ...options,

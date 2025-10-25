@@ -1,4 +1,4 @@
-// backend/src/middlewares/autenticacion.js
+// backend/src/middleware/autenticacion.js
 // ————————————————————————————————————————————————
 // Middleware de autenticación por JWT.
 // Extrae "Authorization: Bearer <token>", verifica (utils/jwt) y añade req.usuario.
@@ -20,9 +20,10 @@ export default function autenticacion(req, res, next) {
   }
 
   try {
-    // verificar() ya usa el secreto del entorno y clockTolerance=5
+    // verificar() ya usa el secreto del entorno y puede aplicar clockTolerance
     const payload = verificar(token);
 
+    // Estructura que usan los middlewares/rutas aguas abajo (req.usuario.id, etc.)
     req.usuario = {
       id: payload.uid,
       nombre: payload.nombre,

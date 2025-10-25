@@ -9,6 +9,7 @@ import { tarjetasApi } from '../servicios/tarjetas';
 import { logout } from '../utils/auth';
 
 const OPCIONES_ETIQUETAS = ['lugares', 'experiencias', 'rutas'];
+const OPCIONES_VISIBILIDAD = ['privado', 'publico', 'amigos'];
 
 // Acepta solo http/https
 const sanitizeUrl = (url = '') => {
@@ -166,7 +167,7 @@ export default function EditorTarjeta() {
   const faltan = {
     titulo: !form.titulo.trim(),
     descripcion: !form.descripcion.trim(),
-    visibilidad: !['publico', 'privado'].includes(form.visibilidad),
+    visibilidad: !OPCIONES_VISIBILIDAD.includes(form.visibilidad),
     etiquetas: (form.etiquetas || []).length === 0,
     imagenes: (form.imagenes || []).length === 0,
   };
@@ -398,17 +399,18 @@ export default function EditorTarjeta() {
                   <label className="form-label" htmlFor="sel-visibilidad">Visibilidad <span className="text-danger">*</span></label>
                   <select
                     id="sel-visibilidad"
-                    className={`form-select ${!['publico', 'privado'].includes(form.visibilidad) ? 'is-invalid' : ''}`}
+                    className={`form-select ${!OPCIONES_VISIBILIDAD.includes(form.visibilidad) ? 'is-invalid' : ''}`}
                     name="visibilidad"
                     value={form.visibilidad}
                     onChange={cambiar}
                     required
-                    aria-invalid={!['publico', 'privado'].includes(form.visibilidad)}
+                    aria-invalid={!OPCIONES_VISIBILIDAD.includes(form.visibilidad)}
                   >
                     <option value="privado">Privado</option>
                     <option value="publico">Público</option>
+                    <option value="amigos">Amigos</option>
                   </select>
-                  {!['publico', 'privado'].includes(form.visibilidad) && (
+                  {!OPCIONES_VISIBILIDAD.includes(form.visibilidad) && (
                     <div className="invalid-feedback">Selecciona una visibilidad.</div>
                   )}
                 </div>

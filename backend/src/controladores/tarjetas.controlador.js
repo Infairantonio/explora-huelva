@@ -2,12 +2,15 @@
 // ————————————————————————————————————————————————————————
 // Controlador de "Tarjetas" (lugares/experiencias/rutas) con CRUD,
 // subida de media y listados paginados.
+// Soporta visibilidades: 'publico' | 'privado' | 'amigos'.
 // Incluye detalle público: publicaUna (GET /api/tarjetas/publicas/:id)
+// Y listado de amigos: amigos (GET /api/tarjetas/amigos)
 // ————————————————————————————————————————————————————————
 
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import Tarjeta from '../modelos/tarjeta.modelo.js';
+import Amigo from '../modelos/amigo.modelo.js';
 
 // ---------- helpers ----------
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -18,9 +21,9 @@ const ETIQUETAS_PERMITIDAS = ['lugares', 'experiencias', 'rutas'];
 const uniq = (arr) => [...new Set(arr)];
 const toArray = (v) => (Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]));
 
-// Normaliza string "publico|privado"
+// Normaliza string "publico|privado|amigos"
 function normalizarVisibilidad(v) {
-  return v === 'publico' ? 'publico' : 'privado';
+  return v === 'publico' ? 'publico' : v === 'amigos' ? 'amigos' : 'privado';
 }
 
 // Filtra a etiquetas permitidas
@@ -82,7 +85,7 @@ function mapValidationError(err) {
   }));
 }
 
-/* ====== NUEVO: helpers de salida para imágenes ====== */
+/* ====== helpers de salida para imágenes ====== */
 
 // extrae solo el nombre de archivo de una url/ruta
 const fileNameFrom = (u) => {
@@ -121,11 +124,27 @@ const mapVideo = (v) => {
 const serializeTarjeta = (doc) => {
   const o = doc?.toObject ? doc.toObject() : { ...doc };
   o.imagenes = mapImagenes(o.imagenes);
-  if (o.imagen) o.imagen = toPublicUrl(o.imagen);        // por si tienes campo legacy
-  if (o.imagenUrl) o.imagenUrl = toPublicUrl(o.imagenUrl); // legacy string única
+  if (o.imagen) o.imagen = toPublicUrl(o.imagen);        // legacy
+  if (o.imagenUrl) o.imagenUrl = toPublicUrl(o.imagenUrl); // legacy
   if (o.videoUrl) o.videoUrl = mapVideo(o.videoUrl);
   return o;
 };
+
+/* ====== helper amistad ====== */
+async function sonAmigos(userIdA, userIdB) {
+  if (!userIdA || !userIdB) return false;
+  if (String(userIdA) === String(userIdB)) return true; // propietario
+  const rel = await Amigo.findOne({
+    estado: 'aceptada',
+    $or: [
+      { solicitante: userIdA, receptor: userIdB },
+      { solicitante: userIdB, receptor: userIdA },
+    ],
+  })
+    .select({ _id: 1 })
+    .lean();
+  return !!rel;
+}
 
 // ---------- Crear ----------
 export async function crear(req, res) {
@@ -208,7 +227,7 @@ export async function mias(req, res) {
   }
 }
 
-// ---------- Listar públicas ----------
+// ---------- Listar públicas (sin token) ----------
 export async function publicas(req, res) {
   try {
     const page = parsePage(req.query.page, 1);
@@ -244,6 +263,67 @@ export async function publicas(req, res) {
   }
 }
 
+/* ---------- Listar tarjetas de AMIGOS (requiere token) ----------
+   Devuelve tarjetas con visibilidad 'amigos' de usuarios que
+   tienen amistad aceptada con el usuario autenticado.
+*/
+export async function amigos(req, res) {
+  try {
+    const page = parsePage(req.query.page, 1);
+    const limit = parseLimit(req.query.limit, 12, 1, 50);
+    const uid = req.usuario.id;
+
+    // Obtener IDs de amigos (estado aceptada)
+    const relaciones = await Amigo.find({
+      estado: 'aceptada',
+      $or: [{ solicitante: uid }, { receptor: uid }],
+    })
+      .select({ solicitante: 1, receptor: 1 })
+      .lean();
+
+    const friendIds = new Set();
+    for (const r of relaciones) {
+      const a = String(r.solicitante);
+      const b = String(r.receptor);
+      if (a !== uid) friendIds.add(a);
+      if (b !== uid) friendIds.add(b);
+    }
+
+    if (friendIds.size === 0) {
+      return res.json({
+        ok: true,
+        items: [],
+        meta: { page, limit, total: 0, pages: 0 },
+      });
+    }
+
+    const filtro = {
+      visibilidad: 'amigos',
+      usuario: { $in: Array.from(friendIds) },
+      eliminado: { $ne: true },
+    };
+
+    const [items, total] = await Promise.all([
+      Tarjeta.find(filtro)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Tarjeta.countDocuments(filtro),
+    ]);
+
+    const itemsOut = items.map(serializeTarjeta);
+
+    return res.json({
+      ok: true,
+      items: itemsOut,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (e) {
+    return res.status(500).json({ ok: false, mensaje: 'Error listando amigos', error: e.message });
+  }
+}
+
 // ---------- Detalle público (sin token) ----------
 export async function publicaUna(req, res) {
   try {
@@ -274,8 +354,20 @@ export async function una(req, res) {
     if (!doc) return res.status(404).json({ ok: false, mensaje: 'No encontrada' });
 
     const esMia = req.usuario && String(doc.usuario) === req.usuario.id;
-    if (!esMia && doc.visibilidad !== 'publico') {
-      return res.status(403).json({ ok: false, mensaje: 'Sin permiso' });
+
+    if (!esMia) {
+      // Pública → ok
+      if (doc.visibilidad === 'publico') {
+        return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
+      }
+      // Amigos → comprobar relación
+      if (doc.visibilidad === 'amigos') {
+        const okAmigo = await sonAmigos(req.usuario.id, doc.usuario);
+        if (!okAmigo) return res.status(403).json({ ok: false, mensaje: 'Sin permiso' });
+      } else {
+        // Privado y no es del usuario
+        return res.status(403).json({ ok: false, mensaje: 'Sin permiso' });
+      }
     }
 
     return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });

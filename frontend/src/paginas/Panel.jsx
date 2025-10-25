@@ -97,6 +97,11 @@ export default function Panel() {
           Mis tarjetas {visibles?.length ? <small className="text-muted">({visibles.length})</small> : null}
         </h1>
         <div className="d-flex gap-2">
+          {/* 👇 Nuevo botón Amigos */}
+          <Link to="/panel/amigos" className={`btn btn-outline-primary ${cargando ? 'disabled' : ''}`} aria-disabled={cargando}>
+            <i className="bi bi-people me-1" /> Amigos
+          </Link>
+
           <button className="btn btn-outline-secondary" onClick={cargar} disabled={cargando}>
             <i className="bi bi-arrow-clockwise me-1" /> {cargando ? 'Cargando…' : 'Recargar'}
           </button>

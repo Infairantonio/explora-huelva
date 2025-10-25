@@ -20,6 +20,7 @@ import rutaAuth from "./rutas/auth.ruta.js";                 // /api/auth
 import rutaTarjetas from "./rutas/tarjetas.ruta.js";         // /api/tarjetas
 import rutaComentarios from "./rutas/comentarios.ruta.js";   // /api/...
 import adminTarjetasRouter from "./rutas/admin.tarjetas.ruta.js"; // /api/admin/*
+import amigosRouter from "./rutas/amigos.ruta.js";           // /api/amigos
 
 const app = express();
 
@@ -30,7 +31,7 @@ const CADENA_MONGO = process.env.CADENA_MONGO;
 // Permitir varios orígenes separados por comas
 const ORIGENES_PERMITIDOS = (process.env.FRONT_ORIGEN || "http://localhost:5173")
   .split(",")
-  .map(s => s.trim())
+  .map((s) => s.trim())
   .filter(Boolean);
 
 // ==== /uploads estáticos ====
@@ -42,7 +43,6 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "1h" }));
 // Alias para quienes piden /api/uploads desde el frontend (proxy /api)
 app.use("/api/uploads", express.static(UPLOAD_DIR, { maxAge: "1h" }));
-
 
 // Pequeñas hardening
 app.disable("x-powered-by");
@@ -74,6 +74,7 @@ app.get("/", (_req, res) => {
 app.use("/api/salud", rutaSalud);
 app.use("/api/auth", rutaAuth);
 app.use("/api/tarjetas", rutaTarjetas);
+app.use("/api/amigos", amigosRouter);   // ⬅️ NUEVO: sistema de amigos
 app.use("/api", rutaComentarios);
 app.use("/api", adminTarjetasRouter);
 

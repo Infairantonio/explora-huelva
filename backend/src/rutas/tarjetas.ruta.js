@@ -4,6 +4,7 @@
 // Valida creación: título/descripcion/visibilidad/≥1 etiqueta/≥1 imagen.
 // Vídeo opcional. Lat/Lng opcionales (si envías uno, envía el otro).
 // Incluye detalle público por ID: GET /api/tarjetas/publicas/:id
+// Añadido: listado de amigos GET /api/tarjetas/amigos
 // ————————————————————————————————————————————————————
 
 import { Router } from 'express';
@@ -11,7 +12,7 @@ import { body, validationResult } from 'express-validator';
 import autenticacion from '../middleware/autenticacion.js';
 import upload from '../middleware/subidas.js';
 import * as ctrl from '../controladores/tarjetas.controlador.js';
-import { ETIQUETAS_PERMITIDAS } from '../modelos/tarjeta.modelo.js';
+import { ETIQUETAS_PERMITIDAS, VISIBILIDADES_PERMITIDAS } from '../modelos/tarjeta.modelo.js';
 
 const router = Router();
 
@@ -77,7 +78,8 @@ const reglasCrear = [
     .trim()
     .isLength({ min: 1, max: 1000 }).withMessage('La descripción es obligatoria y máx. 1000 caracteres'),
   body('visibilidad')
-    .isIn(['publico', 'privado']).withMessage('Visibilidad inválida'),
+    // acepta 'publico' | 'privado' | 'amigos'
+    .isIn(VISIBILIDADES_PERMITIDAS).withMessage('Visibilidad inválida'),
   body('videoUrl')
     .optional({ checkFalsy: true })
     .custom(v => !v || urlOk(v)).withMessage('URL de vídeo no válida'),
@@ -108,18 +110,19 @@ const reglasCrear = [
 ];
 
 // ===== PÚBLICAS (sin token) =====
- // ===== PÚBLICAS (sin token) =====
-+router.get('/', ctrl.publicas);           // ← nuevo: alias para listado público en /api/tarjetas
- router.get('/publicas', ctrl.publicas);
- // Detalle público por ID (solo tarjetas con visibilidad 'publico')
- router.get('/publicas/:id', ctrl.publicaUna);
-
+router.get('/', ctrl.publicas);           // alias listado público en /api/tarjetas
+router.get('/publicas', ctrl.publicas);
+// Detalle público por ID (solo tarjetas con visibilidad 'publico')
+router.get('/publicas/:id', ctrl.publicaUna);
 
 // ===== SUBIDA RÁPIDA DE 1 IMAGEN (privada) =====
 router.post('/subir-imagen', autenticacion, upload.single('file'), ctrl.subirImagen);
 
 // ===== PRIVADAS (requieren token) =====
 router.get('/mias', autenticacion, ctrl.mias);
+
+// ===== AMIGOS (requiere token) =====
+router.get('/amigos', autenticacion, ctrl.amigos);
 
 // Crear tarjeta (valida requeridos). Acepta JSON o multipart.
 // multipart: campos "imagenes" (hasta 10) y "video" (hasta 1) gestionados por el middleware de subidas.
@@ -135,7 +138,7 @@ router.post(
   ctrl.crear
 );
 
-// Obtener 1 tarjeta por ID (privado: exige token; solo accesible si es tuya o es pública)
+// Obtener 1 tarjeta por ID (privado: exige token; respeta visibilidad público/amigos/privado)
 router.get('/:id', autenticacion, ctrl.una);
 
 // Actualizar tarjeta (solo propietario). Acepta mismas medias que crear.

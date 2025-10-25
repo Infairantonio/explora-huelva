@@ -20,6 +20,26 @@ const toInt = (v, d) => {
   return Number.isFinite(n) && n > 0 ? n : d;
 };
 
+// Normaliza el parámetro "orden" (acepta formatos viejo y nuevo)
+function normalizarOrden(orden = '') {
+  const mapViejo = {
+    creadoDesc: { createdAt: -1 },
+    creadoAsc: { createdAt: 1 },
+    actualizadoDesc: { updatedAt: -1 },
+    actualizadoAsc: { updatedAt: 1 },
+  };
+  if (mapViejo[orden]) return mapViejo[orden];
+
+  // formatos nuevos tipo "-createdAt" | "createdAt" | "-updatedAt" | "updatedAt"
+  const allowed = new Set(['createdAt', 'updatedAt']);
+  const field = orden.replace(/^-/, '');
+  const dir = orden.startsWith('-') ? -1 : 1;
+  if (allowed.has(field)) return { [field]: dir };
+
+  // por defecto
+  return { createdAt: -1 };
+}
+
 // GET /admin/tarjetas  (listado con filtros)
 router.get('/admin/tarjetas', autenticacion, requiereRol('admin'), async (req, res) => {
   try {
@@ -31,16 +51,26 @@ router.get('/admin/tarjetas', autenticacion, requiereRol('admin'), async (req, r
       desde = '',
       hasta = '',
       page = '1',
-      pageSize = '25',
+      // compat: admitimos pageSize y limit; prioriza limit si llega
+      pageSize = '',
+      limit = '',
       orden = 'creadoDesc',
     } = req.query;
 
     const filtro = {};
 
+    // eliminadas: por defecto fuera, salvo incDel=1
     if (incDel !== '1') filtro.eliminado = false;
-    if (vis === 'publico' || vis === 'privado') filtro.visibilidad = vis;
+
+    // visibilidad: ahora también 'amigos'
+    if (['publico', 'privado', 'amigos'].includes(vis)) {
+      filtro.visibilidad = vis;
+    }
+
+    // etiqueta
     if (et) filtro.etiquetas = et;
 
+    // rango fechas (createdAt)
     if (desde || hasta) {
       filtro.createdAt = {};
       if (desde && !Number.isNaN(Date.parse(desde))) filtro.createdAt.$gte = new Date(desde);
@@ -48,6 +78,7 @@ router.get('/admin/tarjetas', autenticacion, requiereRol('admin'), async (req, r
       if (!Object.keys(filtro.createdAt).length) delete filtro.createdAt;
     }
 
+    // texto libre
     if (q && q.trim()) {
       filtro.$or = [
         { $text: { $search: q } },
@@ -57,16 +88,12 @@ router.get('/admin/tarjetas', autenticacion, requiereRol('admin'), async (req, r
     }
 
     const pageNum = Math.max(1, toInt(page, 1));
-    const size = Math.min(100, toInt(pageSize, 25));
+    // usa limit si viene; si no, pageSize (compat); por defecto 25; tope 100
+    const sizeParam = limit || pageSize || '25';
+    const size = Math.min(100, toInt(sizeParam, 25));
     const skip = (pageNum - 1) * size;
 
-    const mapOrden = {
-      creadoDesc: { createdAt: -1 },
-      creadoAsc: { createdAt: 1 },
-      actualizadoDesc: { updatedAt: -1 },
-      actualizadoAsc: { updatedAt: 1 },
-    };
-    const sort = mapOrden[orden] || mapOrden.creadoDesc;
+    const sort = normalizarOrden(orden);
 
     const [total, items] = await Promise.all([
       Tarjeta.countDocuments(filtro),
@@ -79,7 +106,7 @@ router.get('/admin/tarjetas', autenticacion, requiereRol('admin'), async (req, r
         .lean(),
     ]);
 
-    res.json({ ok: true, total, page: pageNum, pageSize: size, items });
+    res.json({ ok: true, total, page: pageNum, limit: size, items });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('GET /admin/tarjetas error:', err);

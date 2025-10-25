@@ -128,10 +128,34 @@ export default function Pie() {
           <div className="col-6 col-md-2">
             <h6 className="text-uppercase text-secondary fw-bold small">Compañía</h6>
             <ul className="list-unstyled mb-0">
-              <li><a className="link-light link-opacity-75-hover d-inline-block py-1" href="#" onClick={goTop}>Sobre nosotros</a></li>
-              <li><a className="link-light link-opacity-75-hover d-inline-block py-1" href="#" onClick={goTop}>Blog</a></li>
-              <li><a className="link-light link-opacity-75-hover d-inline-block py-1" href="#" onClick={goTop}>Contacto</a></li>
-              <li><a className="link-light link-opacity-75-hover d-inline-block py-1" href="#" onClick={goTop}>Ayuda</a></li>
+              <li>
+                <Link
+                  className="link-light link-opacity-75-hover d-inline-block py-1"
+                  to="/sobre"
+                  onClick={goTop}
+                >
+                  Sobre nosotros
+                </Link>
+              </li>
+              <li>
+                <Link
+                  className="link-light link-opacity-75-hover d-inline-block py-1"
+                  to="/blog"
+                  onClick={goTop}
+                >
+                  Blog
+                </Link>
+              </li>
+              <li>
+                <a className="link-light link-opacity-75-hover d-inline-block py-1" href="#" onClick={goTop}>
+                  Contacto
+                </a>
+              </li>
+              <li>
+                <a className="link-light link-opacity-75-hover d-inline-block py-1" href="#" onClick={goTop}>
+                  Ayuda
+                </a>
+              </li>
             </ul>
           </div>
 
