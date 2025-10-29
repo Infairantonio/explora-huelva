@@ -9,35 +9,127 @@ export default function Registro() {
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje]   = useState("");
 
+  // NUEVO: paso de UI y soporte de reenviar
+  const [paso, setPaso] = useState("form"); // form | enviado
+  const [cuentaEmail, setCuentaEmail] = useState("");
+  const [reenviando, setReenviando] = useState(false);
+  const [info, setInfo] = useState(null);
+
   const navigate = useNavigate();
 
   const enviar = async (e) => {
     e.preventDefault();
     if (cargando) return;
-    setMensaje(""); setCargando(true);
-   try {
-  const data = await register({ nombre, email, password }); // NO debe guardar token
-  if (data?.ok && data?.necesitaVerificar) {
-    // manda a la pantalla de verificación con el email
-    navigate(`/verifica?enviado=1&email=${encodeURIComponent(email)}`, { replace: true });
-  } else if (data?.ok && data?.token) {
-    // fallback por si en algún entorno sigues emitiendo token en el registro
-    navigate("/panel", { replace: true });
-  } else {
-    throw new Error("No se pudo completar el registro");
-  }
-} catch (err) {
-  const detalle =
-    err?.payload?.mensaje ||
-    (Array.isArray(err?.payload?.errores) && err.payload.errores[0]?.msg) ||
-    err?.message || "Error al registrar";
-  setMensaje("❌ " + detalle);
-} finally {
-  setCargando(false);
-}
+    setMensaje("");
+    setInfo(null);
+    setCargando(true);
 
+    try {
+      const data = await register({ nombre, email, password }); // NO guarda token
+      if (data?.ok && data?.necesitaVerificar) {
+        // ✅ En lugar de ir a /verifica sin token, mostramos pantalla de "correo enviado"
+        setCuentaEmail(email);
+        setPaso("enviado");
+        setInfo("Te enviamos un correo con un enlace para verificar tu cuenta. Revisa también Spam.");
+      } else if (data?.ok && data?.token) {
+        // Fallback si en algún entorno emites token en el registro
+        navigate("/panel", { replace: true });
+      } else {
+        throw new Error("No se pudo completar el registro");
+      }
+    } catch (err) {
+      const detalle =
+        err?.payload?.mensaje ||
+        (Array.isArray(err?.payload?.errores) && err.payload.errores[0]?.msg) ||
+        err?.message || "Error al registrar";
+      setMensaje("❌ " + detalle);
+    } finally {
+      setCargando(false);
+    }
   };
 
+  // NUEVO: Reenviar verificación
+  const reenviar = async () => {
+    try {
+      setReenviando(true);
+      setInfo(null);
+      setMensaje("");
+      const correo = (cuentaEmail || email || "").trim();
+      const res = await fetch("/api/auth/reenviar-verificacion", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: correo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.mensaje || "No se pudo reenviar el correo.");
+      }
+      setInfo("Hemos reenviado el correo de verificación. Revisa tu bandeja.");
+    } catch (e) {
+      setMensaje("❌ " + (e?.message || "Error al reenviar verificación."));
+    } finally {
+      setReenviando(false);
+    }
+  };
+
+  // NUEVO: Pantalla de "correo enviado"
+  if (paso === "enviado") {
+    const correo = (cuentaEmail || email || "").trim();
+    const dominio = correo.split("@")[1] || "";
+    const enlaces = {
+      "gmail.com": "https://mail.google.com/",
+      "hotmail.com": "https://outlook.live.com/",
+      "outlook.com": "https://outlook.live.com/",
+      "yahoo.es": "https://mail.yahoo.com/",
+      "yahoo.com": "https://mail.yahoo.com/",
+      "icloud.com": "https://www.icloud.com/mail",
+    };
+    const abrirBuzon = enlaces[dominio] || null;
+
+    return (
+      <div className="auth-wrap">
+        <div className="container">
+          <div className="auth-layout">
+            <div className="auth-copy">
+              <h2>Explora Huelva</h2>
+              <p>Confirma tu email para activar la cuenta.</p>
+            </div>
+            <div className="card auth-card shadow border-0 ms-auto">
+              <div className="card-body">
+                <h1 className="card-title fw-bold text-primary mb-3">Verifica tu correo</h1>
+                {info && <div className="alert alert-info">{info}</div>}
+                {mensaje && <div className="alert alert-danger">{mensaje}</div>}
+                <p className="mb-2">Enviamos un enlace de verificación a:</p>
+                <p className="fw-bold">{correo || "(tu correo)"}</p>
+                <ul className="small text-muted">
+                  <li>Abre el correo y pulsa <strong>“Verificar mi cuenta”</strong>.</li>
+                  <li>Si no lo ves, revisa la carpeta <strong>Spam</strong> o <strong>No deseado</strong>.</li>
+                  <li>El enlace caduca en <strong>24 horas</strong>.</li>
+                </ul>
+                <div className="d-flex align-items-center gap-2 mt-2">
+                  <button className="btn btn-secondary" onClick={reenviar} disabled={reenviando}>
+                    {reenviando ? "Reenviando…" : "Reenviar verificación"}
+                  </button>
+                  {abrirBuzon && (
+                    <a className="btn btn-outline-primary" href={abrirBuzon} target="_blank" rel="noreferrer">
+                      Abrir mi correo
+                    </a>
+                  )}
+                  <Link to="/login" className="btn btn-link ms-auto">Ir a iniciar sesión</Link>
+                </div>
+                <hr />
+                <p className="small mb-0">
+                  ¿Problemas? Puedes solicitar otro enlace más tarde desde <Link to="/olvide">“¿Olvidaste tu contraseña?”</Link>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Pantalla de formulario (lo que ya tenías)
   return (
     <div className="auth-wrap">
       <div className="container">
@@ -52,28 +144,46 @@ export default function Registro() {
               {mensaje && <div className="alert alert-info">{mensaje}</div>}
               <form onSubmit={enviar} noValidate>
                 <div className="mb-3">
-  <label className="form-label">Nombre</label>
-  <input
-    className="form-control"
-    value={nombre}
-    onChange={(e) => setNombre(e.target.value)}
-    required
-    minLength={2}  // igual que la validación del backend
-  />
-</div>
+                  <label className="form-label">Nombre</label>
+                  <input
+                    className="form-control"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    required
+                    minLength={2} // igual que el backend
+                  />
+                </div>
 
                 <div className="mb-3">
                   <label className="form-label">Email</label>
-                  <input className="form-control" type="email" value={email}
-                         onChange={(e)=>setEmail(e.target.value)} required />
+                  <input
+                    className="form-control"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
+
                 <div className="mb-3">
                   <label className="form-label">Contraseña</label>
-                  <input className="form-control" type="password" value={password}
-                         onChange={(e)=>setPassword(e.target.value)} required />
+                  <input
+                    className="form-control"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <div className="form-text">
+                    Debe ser fuerte: mínimo 10 caracteres, mayúsculas/minúsculas, números y símbolos.
+                  </div>
                 </div>
+
                 <div className="d-flex align-items-center gap-2">
-                  <button className="btn btn-primary px-4" disabled={cargando || !nombre || !email || !password}>
+                  <button
+                    className="btn btn-primary px-4"
+                    disabled={cargando || !nombre || !email || !password}
+                  >
                     {cargando ? "Creando…" : "Crear cuenta"}
                   </button>
                   <Link to="/login" className="btn btn-link">Ya tengo cuenta</Link>
