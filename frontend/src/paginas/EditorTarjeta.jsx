@@ -1,5 +1,8 @@
 // src/paginas/EditorTarjeta.jsx
-// Pantalla para crear o editar una tarjeta (vídeo y lat/lng ocultos por ahora, conservando código comentado)
+// Pantalla para crear o editar una tarjeta.
+// Nota importante: las imágenes se aceptan tal cual las sube el usuario,
+// pero la optimización "de verdad" (tamaño y peso) se hace en el backend
+// usando sharp. Aquí solo avisamos si el fichero es muy grande.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -11,14 +14,18 @@ import { logout } from '../utils/auth';
 const OPCIONES_ETIQUETAS = ['lugares', 'experiencias', 'rutas'];
 const OPCIONES_VISIBILIDAD = ['privado', 'publico', 'amigos'];
 
-// Acepta solo http/https
+// Acepta solo http/https (por si en el futuro se vuelve a usar para vídeo, etc.)
 const sanitizeUrl = (url = '') => {
   try {
     const u = new URL(url);
     return ['http:', 'https:'].includes(u.protocol) ? url : '';
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 };
 
+// Límite "blando" solo para avisar al usuario en el frontend.
+// No bloquea la subida: el backend es quien optimiza/limita realmente.
 const MAX_IMG_MB = 8;
 
 // Normaliza números desde input (admite coma decimal). '' -> null
@@ -31,7 +38,9 @@ const toNum = (s) => {
 
 // Detecta cancelación para no ensuciar la UI
 const isAbortError = (e) =>
-  e?.name === 'AbortError' || e?.code === 'ERR_CANCELED' || /abort(ed)?/i.test(e?.message || '');
+  e?.name === 'AbortError' ||
+  e?.code === 'ERR_CANCELED' ||
+  /abort(ed)?/i.test(e?.message || '');
 
 export default function EditorTarjeta() {
   const { id } = useParams();
@@ -75,19 +84,28 @@ export default function EditorTarjeta() {
         titulo: t.titulo || '',
         descripcion: t.descripcion || '',
         // La API ya normaliza a "/api/uploads/...", úsalo tal cual
-        imagenes: Array.isArray(t.imagenes) ? t.imagenes : (t.imagenUrl ? [t.imagenUrl] : []),
+        imagenes: Array.isArray(t.imagenes)
+          ? t.imagenes
+          : t.imagenUrl
+          ? [t.imagenUrl]
+          : [],
         videoUrl: t.videoUrl || '',
         visibilidad: t.visibilidad || 'privado',
         etiquetas: Array.isArray(t.etiquetas) ? t.etiquetas : [],
-        lat: (t.lat ?? '') === '' || t.lat == null ? '' : String(t.lat),
-        lng: (t.lng ?? '') === '' || t.lng == null ? '' : String(t.lng),
+        lat:
+          (t.lat ?? '') === '' || t.lat == null ? '' : String(t.lat),
+        lng:
+          (t.lng ?? '') === '' || t.lng == null ? '' : String(t.lng),
       });
       setAccuracy(null);
     } catch (e) {
       if (isAbortError(e)) return;
       if (e?.status === 401) {
         logout();
-        navigate('/login', { replace: true, state: { from: location } });
+        navigate('/login', {
+          replace: true,
+          state: { from: location },
+        });
         return;
       }
       setMensaje(e?.message || 'No se pudo cargar');
@@ -104,46 +122,68 @@ export default function EditorTarjeta() {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
   };
+
   const seleccionarArchivo = () => fileRef.current?.click();
 
-  // Subir una imagen
+  // Subir una imagen (deja subir cualquier tamaño razonable,
+  // solo avisa si es muy grande; el backend la optimiza con sharp).
   const onFileChange = async (e) => {
     const f = e.target.files?.[0];
-    e.target.value = ''; // resetea siempre
+    e.target.value = ''; // resetea siempre el input para permitir re-seleccionar
     if (!f) return;
 
     setMensaje('');
 
+    // 1) Validamos que realmente sea una imagen
     if (!f.type.startsWith('image/')) {
       setMensaje('El archivo debe ser una imagen.');
       return;
     }
+
+    // 2) Si supera el tamaño "blando", solo mostramos un aviso,
+    //    pero NO bloqueamos la subida. El trabajo serio lo hace el backend.
     if (f.size > MAX_IMG_MB * 1024 * 1024) {
-      setMensaje(`La imagen excede ${MAX_IMG_MB}MB.`);
-      return;
+      setMensaje(
+        `Ojo: la imagen es muy pesada (más de ${MAX_IMG_MB}MB), ` +
+          'la optimizaremos en el servidor para que la web siga yendo fluida.'
+      );
+      // No hay return aquí: dejamos pasar el fichero.
     }
 
+    // Cancelamos subida anterior si la hubiera
     uploadAbortRef.current?.abort();
     const controller = new AbortController();
     uploadAbortRef.current = controller;
 
     try {
       setSubiendo(true);
-      const r = await tarjetasApi.subirImagen(f, { signal: controller.signal });
-      // ⬇️ La API ahora devuelve { publicUrl, filename, url }. Para el front usamos publicUrl.
-      const nueva = r.publicUrl || r.url; // fallback por si no actualizaste aún el backend
-      if (!nueva) throw new Error('Respuesta inesperada al subir imagen');
 
-      // Añadir URL evitando duplicados
+      // Enviamos el fichero original: el backend (sharp) lo redimensiona y lo comprime.
+      const r = await tarjetasApi.subirImagen(f, {
+        signal: controller.signal,
+      });
+
+      // ⬇️ La API devuelve { publicUrl, filename, url }. Para el front usamos publicUrl.
+      const nueva = r.publicUrl || r.url; // fallback por si el backend no está actualizado
+      if (!nueva)
+        throw new Error('Respuesta inesperada al subir imagen');
+
+      // Añadir URL evitando duplicados (por si el usuario sube la misma varias veces)
       setForm((prev) => {
-        const set = new Set([...(prev.imagenes || []), nueva].filter(Boolean));
+        const set = new Set([
+          ...(prev.imagenes || []),
+          nueva,
+        ].filter(Boolean));
         return { ...prev, imagenes: Array.from(set) };
       });
     } catch (e2) {
       if (isAbortError(e2)) return;
       if (e2?.status === 401) {
         logout();
-        navigate('/login', { replace: true, state: { from: location } });
+        navigate('/login', {
+          replace: true,
+          state: { from: location },
+        });
         return;
       }
       setMensaje(e2?.message || 'Error subiendo la imagen');
@@ -153,7 +193,10 @@ export default function EditorTarjeta() {
   };
 
   const quitarImagen = (idx) =>
-    setForm((prev) => ({ ...prev, imagenes: prev.imagenes.filter((_, i) => i !== idx) }));
+    setForm((prev) => ({
+      ...prev,
+      imagenes: prev.imagenes.filter((_, i) => i !== idx),
+    }));
 
   const toggleEtiqueta = (tag) => {
     setForm((f) => {
@@ -172,18 +215,37 @@ export default function EditorTarjeta() {
     imagenes: (form.imagenes || []).length === 0,
   };
   const obligatorioOk =
-    !faltan.titulo && !faltan.descripcion && !faltan.visibilidad && !faltan.etiquetas && !faltan.imagenes;
+    !faltan.titulo &&
+    !faltan.descripcion &&
+    !faltan.visibilidad &&
+    !faltan.etiquetas &&
+    !faltan.imagenes;
 
   // Validación de ubicación (oculta lat/lng pero mantenemos la lógica para no romper)
   const latProvided = String(form.lat ?? '').trim() !== '';
   const lngProvided = String(form.lng ?? '').trim() !== '';
   const latNum = toNum(form.lat);
   const lngNum = toNum(form.lng);
-  const latInRange = latNum === null || (latNum !== null && !Number.isNaN(latNum) && latNum >= -90 && latNum <= 90);
-  const lngInRange = lngNum === null || (lngNum !== null && !Number.isNaN(lngNum) && lngNum >= -180 && lngNum <= 180);
+  const latInRange =
+    latNum === null ||
+    (latNum !== null &&
+      !Number.isNaN(latNum) &&
+      latNum >= -90 &&
+      latNum <= 90);
+  const lngInRange =
+    lngNum === null ||
+    (lngNum !== null &&
+      !Number.isNaN(lngNum) &&
+      lngNum >= -180 &&
+      lngNum <= 180);
   const ubicacionOk =
-    (!latProvided && !lngProvided)
-    || (latProvided && lngProvided && !Number.isNaN(latNum) && !Number.isNaN(lngNum) && latInRange && lngInRange);
+    (!latProvided && !lngProvided) ||
+    (latProvided &&
+      lngProvided &&
+      !Number.isNaN(latNum) &&
+      !Number.isNaN(lngNum) &&
+      latInRange &&
+      lngInRange);
 
   // Botón: Usar mi ubicación (Geolocation API) — mantenemos el botón, ocultamos inputs
   const usarMiUbicacion = () => {
@@ -209,9 +271,13 @@ export default function EditorTarjeta() {
       },
       (err) => {
         let msg = 'No se pudo obtener tu ubicación.';
-        if (err?.code === err.PERMISSION_DENIED) msg = 'Permiso de ubicación denegado.';
-        else if (err?.code === err.POSITION_UNAVAILABLE) msg = 'Ubicación no disponible.';
-        else if (err?.code === err.TIMEOUT) msg = 'Tiempo de espera agotado al obtener ubicación.';
+        if (err?.code === err.PERMISSION_DENIED)
+          msg = 'Permiso de ubicación denegado.';
+        else if (err?.code === err.POSITION_UNAVAILABLE)
+          msg = 'Ubicación no disponible.';
+        else if (err?.code === err.TIMEOUT)
+          msg =
+            'Tiempo de espera agotado al obtener ubicación.';
         setMensaje(msg);
         setLocating(false);
       },
@@ -225,11 +291,15 @@ export default function EditorTarjeta() {
     setMensaje('');
 
     if (!obligatorioOk) {
-      setMensaje('Completa los campos obligatorios: título, descripción, visibilidad, al menos 1 etiqueta y 1 imagen.');
+      setMensaje(
+        'Completa los campos obligatorios: título, descripción, visibilidad, al menos 1 etiqueta y 1 imagen.'
+      );
       return;
     }
     if (!ubicacionOk) {
-      setMensaje('Si indicas ubicación, debes rellenar lat y lng con valores válidos (lat -90..90, lng -180..180).');
+      setMensaje(
+        'Si indicas ubicación, debes rellenar lat y lng con valores válidos (lat -90..90, lng -180..180).'
+      );
       return;
     }
     if (subiendo) {
@@ -242,11 +312,15 @@ export default function EditorTarjeta() {
       descripcion: form.descripcion.trim(),
       visibilidad: form.visibilidad,
       // La API ya acepta arrays de strings; pueden ser /api/uploads/... y los normaliza.
-      imagenes: (form.imagenes || []).map((s) => s.trim()).filter(Boolean),
+      imagenes: (form.imagenes || [])
+        .map((s) => s.trim())
+        .filter(Boolean),
       etiquetas: (form.etiquetas || []).filter((t) =>
         OPCIONES_ETIQUETAS.includes((t || '').toLowerCase())
       ),
-      ...(latProvided && lngProvided && ubicacionOk
+      ...(latProvided &&
+      lngProvided &&
+      ubicacionOk
         ? { lat: Number(latNum), lng: Number(lngNum) }
         : {}),
     };
@@ -259,7 +333,10 @@ export default function EditorTarjeta() {
     } catch (e2) {
       if (e2?.status === 401) {
         logout();
-        navigate('/login', { replace: true, state: { from: location } });
+        navigate('/login', {
+          replace: true,
+          state: { from: location },
+        });
         return;
       }
       setMensaje(e2?.message || 'Error guardando');
@@ -274,10 +351,16 @@ export default function EditorTarjeta() {
         <div className="col-12 col-lg-8">
           <div className="card shadow-sm border-0">
             <div className="card-body">
-              <h1 className="h4 mb-3">{id ? 'Editar' : 'Nueva'} tarjeta</h1>
+              <h1 className="h4 mb-3">
+                {id ? 'Editar' : 'Nueva'} tarjeta
+              </h1>
 
               {mensaje && (
-                <div className="alert alert-danger" role="alert" aria-live="assertive">
+                <div
+                  className="alert alert-danger"
+                  role="alert"
+                  aria-live="assertive"
+                >
                   {mensaje}
                 </div>
               )}
@@ -285,10 +368,20 @@ export default function EditorTarjeta() {
               <form onSubmit={enviar} className="row g-3" noValidate>
                 {/* Título */}
                 <div className="col-12">
-                  <label className="form-label" htmlFor="campo-titulo">Título <span className="text-danger">*</span></label>
+                  <label
+                    className="form-label"
+                    htmlFor="campo-titulo"
+                  >
+                    Título{' '}
+                    <span className="text-danger">*</span>
+                  </label>
                   <input
                     id="campo-titulo"
-                    className={`form-control ${!form.titulo.trim() ? 'is-invalid' : ''}`}
+                    className={`form-control ${
+                      !form.titulo.trim()
+                        ? 'is-invalid'
+                        : ''
+                    }`}
                     name="titulo"
                     value={form.titulo}
                     onChange={cambiar}
@@ -300,15 +393,29 @@ export default function EditorTarjeta() {
                   <div id="ayuda-titulo" className="form-text">
                     Sé claro y descriptivo. Máx. 120 caracteres.
                   </div>
-                  {!form.titulo.trim() && <div className="invalid-feedback">El título es obligatorio.</div>}
+                  {!form.titulo.trim() && (
+                    <div className="invalid-feedback">
+                      El título es obligatorio.
+                    </div>
+                  )}
                 </div>
 
                 {/* Descripción */}
                 <div className="col-12">
-                  <label className="form-label" htmlFor="campo-descripcion">Descripción <span className="text-danger">*</span></label>
+                  <label
+                    className="form-label"
+                    htmlFor="campo-descripcion"
+                  >
+                    Descripción{' '}
+                    <span className="text-danger">*</span>
+                  </label>
                   <textarea
                     id="campo-descripcion"
-                    className={`form-control ${!form.descripcion.trim() ? 'is-invalid' : ''}`}
+                    className={`form-control ${
+                      !form.descripcion.trim()
+                        ? 'is-invalid'
+                        : ''
+                    }`}
                     rows={4}
                     name="descripcion"
                     value={form.descripcion}
@@ -318,16 +425,27 @@ export default function EditorTarjeta() {
                     aria-invalid={!form.descripcion.trim()}
                     aria-describedby="ayuda-descripcion"
                   />
-                  <div id="ayuda-descripcion" className="form-text">
-                    Cuenta qué hace especial este lugar o experiencia. Máx. 1000 caracteres.
+                  <div
+                    id="ayuda-descripcion"
+                    className="form-text"
+                  >
+                    Cuenta qué hace especial este lugar o
+                    experiencia. Máx. 1000 caracteres.
                   </div>
-                  {!form.descripcion.trim() && <div className="invalid-feedback">La descripción es obligatoria.</div>}
+                  {!form.descripcion.trim() && (
+                    <div className="invalid-feedback">
+                      La descripción es obligatoria.
+                    </div>
+                  )}
                 </div>
 
                 {/* Imágenes */}
                 <div className="col-12">
                   <div className="d-flex align-items-center justify-content-between">
-                    <label className="form-label mb-0">Imágenes <span className="text-danger">*</span></label>
+                    <label className="form-label mb-0">
+                      Imágenes{' '}
+                      <span className="text-danger">*</span>
+                    </label>
                     <div className="d-flex gap-2">
                       <button
                         type="button"
@@ -336,7 +454,9 @@ export default function EditorTarjeta() {
                         disabled={subiendo}
                         title="Subir imagen"
                       >
-                        {subiendo ? 'Subiendo…' : 'Añadir imagen'}
+                        {subiendo
+                          ? 'Subiendo…'
+                          : 'Añadir imagen'}
                       </button>
                       <input
                         ref={fileRef}
@@ -351,15 +471,27 @@ export default function EditorTarjeta() {
 
                   <div className="mt-2 d-flex flex-wrap gap-2">
                     {(form.imagenes || []).map((url, i) => (
-                      <div key={url + i} className="position-relative" aria-label={`Imagen ${i + 1}`}>
+                      <div
+                        key={url + i}
+                        className="position-relative"
+                        aria-label={`Imagen ${i + 1}`}
+                      >
                         <img
                           // La API ya devuelve una URL lista para <img src>, úsala sin transformaciones
                           src={url}
                           alt=""
-                          style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6 }}
+                          style={{
+                            width: 120,
+                            height: 80,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                          }}
                           loading="lazy"
                           decoding="async"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          onError={(e) => {
+                            e.currentTarget.style.display =
+                              'none';
+                          }}
                         />
                         <button
                           type="button"
@@ -374,11 +506,13 @@ export default function EditorTarjeta() {
                     ))}
                   </div>
                   {(form.imagenes || []).length === 0 && (
-                    <div className="text-danger small mt-2">Añade al menos una imagen.</div>
+                    <div className="text-danger small mt-2">
+                      Añade al menos una imagen.
+                    </div>
                   )}
                 </div>
 
-                {/* ⛔ VÍDEO OCULTO (conservado) */}
+                {/* ⛔ VÍDEO OCULTO (conservado para el futuro) */}
                 {/*
                 <div className="col-12">
                   <label className="form-label">
@@ -396,22 +530,48 @@ export default function EditorTarjeta() {
 
                 {/* Visibilidad */}
                 <div className="col-12 col-md-4">
-                  <label className="form-label" htmlFor="sel-visibilidad">Visibilidad <span className="text-danger">*</span></label>
+                  <label
+                    className="form-label"
+                    htmlFor="sel-visibilidad"
+                  >
+                    Visibilidad{' '}
+                    <span className="text-danger">*</span>
+                  </label>
                   <select
                     id="sel-visibilidad"
-                    className={`form-select ${!OPCIONES_VISIBILIDAD.includes(form.visibilidad) ? 'is-invalid' : ''}`}
+                    className={`form-select ${
+                      !OPCIONES_VISIBILIDAD.includes(
+                        form.visibilidad
+                      )
+                        ? 'is-invalid'
+                        : ''
+                    }`}
                     name="visibilidad"
                     value={form.visibilidad}
                     onChange={cambiar}
                     required
-                    aria-invalid={!OPCIONES_VISIBILIDAD.includes(form.visibilidad)}
+                    aria-invalid={
+                      !OPCIONES_VISIBILIDAD.includes(
+                        form.visibilidad
+                      )
+                    }
                   >
-                    <option value="privado">Privado</option>
-                    <option value="publico">Público</option>
-                    <option value="amigos">Amigos</option>
+                    <option value="privado">
+                      Privado
+                    </option>
+                    <option value="publico">
+                      Público
+                    </option>
+                    <option value="amigos">
+                      Amigos
+                    </option>
                   </select>
-                  {!OPCIONES_VISIBILIDAD.includes(form.visibilidad) && (
-                    <div className="invalid-feedback">Selecciona una visibilidad.</div>
+                  {!OPCIONES_VISIBILIDAD.includes(
+                    form.visibilidad
+                  ) && (
+                    <div className="invalid-feedback">
+                      Selecciona una visibilidad.
+                    </div>
                   )}
                 </div>
 
@@ -419,30 +579,46 @@ export default function EditorTarjeta() {
                 <div className="col-12 col-md-8">
                   <fieldset>
                     <legend className="form-label mb-2">
-                      Etiquetas <span className="text-danger">*</span>
+                      Etiquetas{' '}
+                      <span className="text-danger">*</span>
                     </legend>
                     <div className="d-flex gap-3 flex-wrap">
                       {OPCIONES_ETIQUETAS.map((tag) => (
-                        <div className="form-check" key={tag}>
+                        <div
+                          className="form-check"
+                          key={tag}
+                        >
                           <input
                             className="form-check-input"
                             type="checkbox"
                             id={`chk-${tag}`}
-                            checked={form.etiquetas.includes(tag)}
-                            onChange={() => toggleEtiqueta(tag)}
+                            checked={form.etiquetas.includes(
+                              tag
+                            )}
+                            onChange={() =>
+                              toggleEtiqueta(tag)
+                            }
                             aria-describedby="ayuda-etiquetas"
                           />
-                          <label className="form-check-label" htmlFor={`chk-${tag}`}>
+                          <label
+                            className="form-check-label"
+                            htmlFor={`chk-${tag}`}
+                          >
                             {tag}
                           </label>
                         </div>
                       ))}
                     </div>
-                    <div id="ayuda-etiquetas" className="form-text">
+                    <div
+                      id="ayuda-etiquetas"
+                      className="form-text"
+                    >
                       Elige al menos una categoría.
                     </div>
                     {(form.etiquetas || []).length === 0 && (
-                      <div className="text-danger small mt-1">Selecciona al menos una etiqueta.</div>
+                      <div className="text-danger small mt-1">
+                        Selecciona al menos una etiqueta.
+                      </div>
                     )}
                   </fieldset>
                 </div>
@@ -450,7 +626,12 @@ export default function EditorTarjeta() {
                 {/* Ubicación — dejamos SOLO el botón (inputs lat/lng ocultos) */}
                 <div className="col-12">
                   <div className="d-flex justify-content-between align-items-center">
-                    <label className="form-label mb-1">Ubicación <small className="text-muted">(opcional)</small></label>
+                    <label className="form-label mb-1">
+                      Ubicación{' '}
+                      <small className="text-muted">
+                        (opcional)
+                      </small>
+                    </label>
                     <button
                       type="button"
                       className="btn btn-sm btn-outline-success"
@@ -459,19 +640,27 @@ export default function EditorTarjeta() {
                       title="Usar mi ubicación actual"
                       aria-live="polite"
                     >
-                      {locating ? 'Obteniendo…' : 'Usar mi ubicación'}
+                      {locating
+                        ? 'Obteniendo…'
+                        : 'Usar mi ubicación'}
                     </button>
                   </div>
 
-                  {/* Inputs ocultos conservados (ver original) */}
+                  {/* Inputs lat/lng siguen existiendo en el estado,
+                      pero no se muestran en el formulario. */}
 
                   {accuracy != null && (
-                    <div className="form-text">Precisión aprox.: ±{accuracy} m</div>
+                    <div className="form-text">
+                      Precisión aprox.: ±{accuracy} m
+                    </div>
                   )}
 
                   {!ubicacionOk && (
                     <div className="text-danger small mt-1">
-                      Si indicas ubicación, debes rellenar <strong>lat</strong> y <strong>lng</strong> con valores válidos.
+                      Si indicas ubicación, debes rellenar{' '}
+                      <strong>lat</strong> y{' '}
+                      <strong>lng</strong> con valores
+                      válidos.
                     </div>
                   )}
                 </div>
@@ -481,10 +670,17 @@ export default function EditorTarjeta() {
                   <button
                     type="submit"
                     className="btn btn-primary"
-                    disabled={guardando || subiendo || !obligatorioOk || !ubicacionOk}
+                    disabled={
+                      guardando ||
+                      subiendo ||
+                      !obligatorioOk ||
+                      !ubicacionOk
+                    }
                     aria-busy={guardando}
                   >
-                    {guardando ? 'Guardando…' : 'Guardar'}
+                    {guardando
+                      ? 'Guardando…'
+                      : 'Guardar'}
                   </button>
                   <button
                     type="button"
@@ -497,7 +693,6 @@ export default function EditorTarjeta() {
                   </button>
                 </div>
               </form>
-
             </div>
           </div>
         </div>

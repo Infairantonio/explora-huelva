@@ -11,6 +11,12 @@ import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import Tarjeta from '../modelos/tarjeta.modelo.js';
 import Amigo from '../modelos/amigo.modelo.js';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs/promises';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+
 
 // ---------- helpers ----------
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -476,26 +482,86 @@ export async function eliminar(req, res) {
 }
 
 // ---------- Subir 1 imagen (multipart/form-data, campo "file") ----------
+// ---------- Subir 1 imagen (multipart/form-data, campo "file") ----------
+// Versión PRO: optimiza la imagen con sharp (reduce peso y tamaño)
 export async function subirImagen(req, res) {
   try {
     if (!req.file) {
       return res.status(400).json({ ok: false, mensaje: 'No se recibió archivo' });
     }
-    const base = baseUploads(req);
-    const filename = req.file.filename;
-    const url = `${base}/${filename}`;
-    const publicUrl = `/api/uploads/${filename}`; // útil directamente para el front
+
+    // Ruta al fichero original que multer ha guardado
+    const originalPath = req.file.path || path.join(UPLOAD_DIR, req.file.filename);
+
+    // Base del nombre (sin extensión)
+    const originalName = req.file.filename || `img-${Date.now()}`;
+    const baseName = originalName.replace(/\.[^.]+$/, '');
+
+    // Nombres de salida optimizados
+    const optimizedName = `${baseName}-opt.jpg`;
+    const thumbName = `${baseName}-thumb.jpg`;
+
+    const optimizedPath = path.join(UPLOAD_DIR, optimizedName);
+    const thumbPath = path.join(UPLOAD_DIR, thumbName);
+
+    // Procesar imagen principal (máx 1600x1600)
+    await sharp(originalPath)
+      .rotate()
+      .resize({
+        width: 1600,
+        height: 1600,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toFile(optimizedPath);
+
+    // Miniatura para listados (ej. 400x300)
+    await sharp(originalPath)
+      .rotate()
+      .resize({
+        width: 400,
+        height: 300,
+        fit: 'cover',
+      })
+      .jpeg({ quality: 70, mozjpeg: true })
+      .toFile(thumbPath);
+
+    // Opcional: borrar el original para no ocupar espacio
+    try {
+      await fs.unlink(originalPath);
+    } catch {
+      // Si falla el borrado no rompemos la respuesta
+    }
+
+    // Construir URLs públicas
+    const base = baseUploads(req); // p.ej. https://tu-dominio/uploads
+    const url = `${base}/${optimizedName}`;
+    const publicUrl = `/api/uploads/${optimizedName}`;
+    const thumbUrl = `/api/uploads/${thumbName}`;
+
+    // Tamaño del fichero optimizado (por curiosidad / debug)
+    let size = null;
+    try {
+      const stats = await fs.stat(optimizedPath);
+      size = stats.size;
+    } catch {
+      size = null;
+    }
 
     return res.status(201).json({
       ok: true,
-      mensaje: 'Imagen subida',
-      url,
-      publicUrl,
-      filename,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
+      mensaje: 'Imagen subida y optimizada',
+      url,          // URL absoluta basada en host
+      publicUrl,    // URL relativa que ya usas en el front
+      thumbUrl,     // miniatura (por si la quieres usar en el futuro)
+      filename: optimizedName,
+      mimetype: 'image/jpeg',
+      size,
     });
   } catch (e) {
+    console.error('Error en subirImagen:', e);
     return res.status(500).json({ ok: false, mensaje: 'Error subiendo imagen', error: e.message });
   }
 }
+
