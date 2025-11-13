@@ -21,12 +21,22 @@ services:
       MONGO_NOMBRE_BD: explora
       JWT_SECRETO: supersecreto
       FRONT_ORIGEN: https://explorahuelva.es
-      volumes:
-      - ./backend/uploads:/app/uploads   # 👈 persistimos subidas en el host
+      PUBLIC_URL: https://explorahuelva.es
+      NODE_ENV: production
+      TZ: Europe/Madrid
+      # ===== SMTP PRODUCCIÓN (Rellena con tus credenciales reales) =====
+      SMTP_HOST: smtp.hostinger.com
+      SMTP_PORT: "587"          # usa "465" si vas con SSL puro
+      SMTP_USER: no-reply@explorahuelva.es
+      SMTP_PASS: Juantalmera.5
+      SMTP_SECURE: "false"      # "true" si usas 465
+      MAIL_FROM: Explora Huelva <no-reply@explorahuelva.es>
+    volumes:
+      - ./backend/uploads:/app/uploads
     depends_on:
       - mongo
     ports:
-      - "4000:5174"   # host:contenedor (tu app escucha en 5174 dentro)
+      - "4000:5174"
 
   web:
     build:
