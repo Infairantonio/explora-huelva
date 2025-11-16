@@ -1,0 +1,18 @@
+explorahuelva.es {
+    encode gzip
+
+    @api path /api/* /uploads/*
+    handle @api {
+        reverse_proxy api:5174
+    }
+
+    handle {
+        reverse_proxy web:80
+    }
+
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+}
