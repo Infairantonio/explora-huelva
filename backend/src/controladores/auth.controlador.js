@@ -133,10 +133,24 @@ export const iniciarSesion = async (req, res) => {
     const remember = Boolean(req.body?.remember);
 
     const usuario = await Usuario.findOne({ email });
-    if (!usuario) return res.status(401).json({ ok: false, mensaje: "Credenciales inválidas" });
+    if (!usuario) {
+      return res.status(401).json({ ok: false, mensaje: "Credenciales inválidas" });
+    }
 
-    if (usuario.lockUntil && usuario.lockUntil > new Date()) {
-      return res.status(423).json({ ok: false, mensaje: "Cuenta bloqueada temporalmente" });
+    // 🔒 Si el usuario está marcado como eliminado -> no puede entrar
+    if (usuario.eliminado) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Tu cuenta ha sido desactivada. Contacta con el administrador.",
+      });
+    }
+
+    // 🔒 Bloqueo manual o temporal
+    if (typeof usuario.isLocked === "function" && usuario.isLocked()) {
+      const msg = usuario.bloqueado
+        ? "Tu cuenta está bloqueada por el administrador."
+        : "Cuenta bloqueada temporalmente por intentos fallidos. Inténtalo más tarde.";
+      return res.status(423).json({ ok: false, mensaje: msg });
     }
 
     const ok = await usuario.validatePassword(password);
@@ -153,13 +167,14 @@ export const iniciarSesion = async (req, res) => {
       return res.status(403).json({ ok: false, mensaje: "Email no verificado." });
     }
 
-    // Resetear lock/contador si procede
+    // Resetear lock/contador si procede + registrar último login
     if (usuario.failedLoginCount || usuario.lockUntil) {
       try {
         usuario.resetLoginLock?.();
-        await usuario.save();
       } catch {}
     }
+    usuario.lastLoginAt = new Date();
+    await usuario.save();
 
     const token = firmarJWT(usuario);
 
@@ -211,6 +226,14 @@ export const refrescar = async (req, res) => {
     const usuario = await Usuario.findById(sesion.userId);
     if (!usuario) {
       return res.status(401).json({ ok: false, mensaje: "Usuario no encontrado" });
+    }
+
+    // 🔒 Si ahora está bloqueado o eliminado, no emitir nuevos tokens
+    if (usuario.eliminado || (typeof usuario.isLocked === "function" && usuario.isLocked())) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "La sesión ya no es válida. Vuelve a iniciar sesión.",
+      });
     }
 
     const token = firmarJWT(usuario);

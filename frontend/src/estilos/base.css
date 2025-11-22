@@ -180,3 +180,11 @@ footer a:hover {
     font-size: 1.6rem;
   }
 }
+
+/* ================================
+   Descripciones con saltos de línea
+   ================================ */
+
+.descripcion-tarjeta {
+  white-space: pre-line;   /* respeta los \n como saltos de línea */
+}

@@ -3,14 +3,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminTarjetas } from "../servicios/adminTarjetas";
+// 👇 IMPORT CORREGIDO: usamos el nombre del servicio que exportamos
+import { adminTarjetasApi as adminTarjetas } from "../servicios/adminTarjetas";
 import { logout } from "../utils/auth";
 
 export default function AdminTarjetas() {
   const navigate = useNavigate();
-  const [estado, setEstado] = useState({ cargando: true, error: "", items: [], total: 0 });
+  const [estado, setEstado] = useState({
+    cargando: true,
+    error: "",
+    items: [],
+    total: 0,
+  });
 
-  // ⬇️ Cambios: usamos "limit" (no pageSize) y añadimos "amigos" como visibilidad
+  // Filtros / parámetros de consulta
   const [f, setF] = useState({
     q: "",
     et: "",
@@ -18,7 +24,7 @@ export default function AdminTarjetas() {
     incDel: true,
     page: 1,
     limit: 25,
-    orden: "-createdAt",
+    orden: "-createdAt", // -createdAt = más nuevas primero
   });
 
   const aborter = useRef(null);
@@ -28,11 +34,16 @@ export default function AdminTarjetas() {
     aborter.current?.abort?.();
     const ctrl = new AbortController();
     aborter.current = ctrl;
+
     try {
-      const r = await adminTarjetas.listar({
+      const filtros = {
         ...params,
         incDel: params.incDel ? 1 : 0,
-      });
+      };
+
+      // 👇 aquí pasamos bien los dos argumentos: filtros + opciones (signal)
+      const r = await adminTarjetas.listar(filtros, { signal: ctrl.signal });
+
       setEstado({
         cargando: false,
         error: "",
@@ -41,9 +52,13 @@ export default function AdminTarjetas() {
       });
     } catch (e) {
       if (e?.name === "AbortError") return;
+
       if (e?.status === 401) {
         logout();
-        navigate("/login", { replace: true, state: { from: { pathname: "/admin/tarjetas" } } });
+        navigate("/login", {
+          replace: true,
+          state: { from: { pathname: "/admin/tarjetas" } },
+        });
         return;
       }
       if (e?.status === 403) {
@@ -89,7 +104,10 @@ export default function AdminTarjetas() {
   };
 
   const eliminar = async (id) => {
-    const motivo = window.prompt("Motivo de eliminación (soft delete):", "Contenido incoherente");
+    const motivo = window.prompt(
+      "Motivo de eliminación (soft delete):",
+      "Contenido incoherente"
+    );
     if (motivo === null) return;
     try {
       await adminTarjetas.eliminar(id, motivo);
@@ -111,20 +129,81 @@ export default function AdminTarjetas() {
   // Badge para visibilidad (incluye 'amigos')
   const VisBadge = ({ vis }) => {
     const v = String(vis || "").toLowerCase();
-    if (v === "publico") return <span className="badge bg-success">Público</span>;
-    if (v === "amigos") return <span className="badge bg-info text-dark">Amigos</span>;
-    if (v === "privado") return <span className="badge bg-secondary">Privado</span>;
+    if (v === "publico")
+      return <span className="badge bg-success">Público</span>;
+    if (v === "amigos")
+      return <span className="badge bg-info text-dark">Amigos</span>;
+    if (v === "privado")
+      return <span className="badge bg-secondary">Privado</span>;
     return <span className="badge bg-light text-dark">{vis || "—"}</span>;
   };
 
+  // Pequeño resumen local de estado
+  const resumen = useMemo(() => {
+    const arr = estado.items || [];
+    let activas = 0;
+    let eliminadas = 0;
+    arr.forEach((it) => {
+      if (it.eliminado) eliminadas++;
+      else activas++;
+    });
+    return { activas, eliminadas };
+  }, [estado.items]);
+
   return (
     <div className="container py-4">
+      {/* Cabecera panel */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h1 className="h4 mb-0">Panel de administración · Tarjetas</h1>
+        <div>
+          <h1 className="h4 mb-1">Panel de administración · Tarjetas</h1>
+          <p className="text-muted small mb-0">
+            Revisa, filtra y modera todas las publicaciones de la plataforma.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-outline-secondary btn-sm"
+          onClick={() => navigate("/admin/usuarios")}
+        >
+          <i className="bi bi-people me-1" />
+          Gestión de usuarios
+        </button>
+      </div>
+
+      {/* Resumen rápido */}
+      <div className="row g-2 mb-3">
+        <div className="col-12 col-sm-4 col-lg-3">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-body py-2">
+              <div className="text-muted small">Total tarjetas (consulta)</div>
+              <div className="fw-semibold fs-5">{estado.total}</div>
+            </div>
+          </div>
+        </div>
+        <div className="col-6 col-sm-4 col-lg-3">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-body py-2">
+              <div className="text-muted small">Activas en la tabla</div>
+              <div className="fw-semibold fs-5">{resumen.activas}</div>
+            </div>
+          </div>
+        </div>
+        <div className="col-6 col-sm-4 col-lg-3">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-body py-2">
+              <div className="text-muted small">Eliminadas en la tabla</div>
+              <div className="fw-semibold fs-5">{resumen.eliminadas}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filtros */}
-      <form className="card card-body shadow-sm border-0 mb-3" onSubmit={onSubmit}>
+      <form
+        className="card card-body shadow-sm border-0 mb-3"
+        onSubmit={onSubmit}
+      >
         <div className="row g-2 align-items-end">
           <div className="col-12 col-md-4">
             <label className="form-label">Buscar</label>
@@ -132,7 +211,7 @@ export default function AdminTarjetas() {
               value={f.q}
               onChange={(e) => setF({ ...f, q: e.target.value })}
               className="form-control"
-              placeholder="título o descripción"
+              placeholder="título, descripción, usuario…"
             />
           </div>
 
@@ -165,10 +244,24 @@ export default function AdminTarjetas() {
           </div>
 
           <div className="col-6 col-md-2">
+            <label className="form-label">Orden</label>
+            <select
+              value={f.orden}
+              onChange={(e) => setF({ ...f, orden: e.target.value })}
+              className="form-select"
+            >
+              <option value="-createdAt">Más nuevas primero</option>
+              <option value="createdAt">Más antiguas primero</option>
+            </select>
+          </div>
+
+          <div className="col-6 col-md-2">
             <label className="form-label">Tamaño página</label>
             <select
               value={f.limit}
-              onChange={(e) => setF({ ...f, limit: Number(e.target.value), page: 1 })}
+              onChange={(e) =>
+                setF({ ...f, limit: Number(e.target.value), page: 1 })
+              }
               className="form-select"
             >
               {[10, 25, 50, 100].map((n) => (
@@ -193,7 +286,11 @@ export default function AdminTarjetas() {
           </div>
 
           <div className="col-12 col-md-2 ms-auto">
-            <button className="btn btn-primary w-100" disabled={estado.cargando} type="submit">
+            <button
+              className="btn btn-primary w-100"
+              disabled={estado.cargando}
+              type="submit"
+            >
               {estado.cargando ? "Cargando…" : "Filtrar"}
             </button>
           </div>
@@ -201,7 +298,11 @@ export default function AdminTarjetas() {
       </form>
 
       {/* Estados */}
-      {estado.error && <div className="alert alert-danger">{estado.error}</div>}
+      {estado.error && (
+        <div className="alert alert-danger" role="alert">
+          {estado.error}
+        </div>
+      )}
 
       {/* Tabla */}
       <div className="table-responsive">
@@ -214,7 +315,7 @@ export default function AdminTarjetas() {
               <th>Etiquetas</th>
               <th>Estado</th>
               <th>Creada</th>
-              <th style={{ width: 200 }}>Acciones</th>
+              <th style={{ width: 220 }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -230,17 +331,26 @@ export default function AdminTarjetas() {
               </tr>
             ) : (
               (estado.items || []).map((it) => (
-                <tr key={it._id} className={it.eliminado ? "table-warning" : ""}>
+                <tr
+                  key={it._id}
+                  className={it.eliminado ? "table-warning" : ""}
+                >
                   <td className="fw-semibold">{it.titulo}</td>
                   <td>
                     {it.usuario?.nombre || ""}
-                    <div className="text-muted small">{it.usuario?.email || ""}</div>
+                    <div className="text-muted small">
+                      {it.usuario?.email || ""}
+                    </div>
                   </td>
-                  <td><VisBadge vis={it.visibilidad} /></td>
+                  <td>
+                    <VisBadge vis={it.visibilidad} />
+                  </td>
                   <td>{(it.etiquetas || []).join(", ")}</td>
                   <td>
                     {it.eliminado ? (
-                      <span className="badge bg-warning text-dark">Eliminada</span>
+                      <span className="badge bg-warning text-dark">
+                        Eliminada
+                      </span>
                     ) : (
                       <span className="badge bg-success">Activa</span>
                     )}
@@ -260,12 +370,15 @@ export default function AdminTarjetas() {
                           className="btn btn-sm btn-outline-success"
                           onClick={() => restaurar(it._id)}
                         >
-                          <i className="bi bi-arrow-counterclockwise" /> Restaurar
+                          <i className="bi bi-arrow-counterclockwise" />{" "}
+                          Restaurar
                         </button>
                       )}
                       <button
                         className="btn btn-sm btn-outline-secondary"
-                        onClick={() => window.open(`/tarjetas/${it._id}`, "_blank")}
+                        onClick={() =>
+                          window.open(`/tarjetas/${it._id}`, "_blank")
+                        }
                         title="Ver detalle público"
                       >
                         Ver
@@ -290,7 +403,9 @@ export default function AdminTarjetas() {
           >
             Anterior
           </button>
-          <span className="btn btn-outline-secondary disabled">{f.page}</span>
+          <span className="btn btn-outline-secondary disabled">
+            {f.page}
+          </span>
           <button
             className="btn btn-outline-secondary"
             disabled={f.page >= paginas || estado.cargando}

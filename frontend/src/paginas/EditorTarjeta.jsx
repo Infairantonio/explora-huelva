@@ -14,15 +14,41 @@ import { logout } from '../utils/auth';
 const OPCIONES_ETIQUETAS = ['lugares', 'experiencias', 'rutas'];
 const OPCIONES_VISIBILIDAD = ['privado', 'publico', 'amigos'];
 
-// Acepta solo http/https (por si en el futuro se vuelve a usar para vídeo, etc.)
-const sanitizeUrl = (url = '') => {
-  try {
-    const u = new URL(url);
-    return ['http:', 'https:'].includes(u.protocol) ? url : '';
-  } catch {
-    return '';
-  }
-};
+// Emojis y chips modernos para 2025 😎
+const EMOJIS_MODERNOS = ['📍', '✨', '🌅', '🏖️', '🚶‍♀️', '🚴‍♂️', '🍽️', '🌲'];
+
+// Pequeñas plantillas de texto para rellenar rápido la descripción
+const PLANTILLAS_DESC = [
+  {
+    id: 'basica',
+    label: 'Plantilla básica',
+    texto:
+      '📍 Cómo llegar:\n\n' +
+      '🕒 Mejor momento para ir:\n\n' +
+      '✨ Lo que más me gustó:\n\n' +
+      '💡 Consejos:\n',
+  },
+  {
+    id: 'ruta',
+    label: 'Plantilla ruta',
+    texto:
+      '🚶‍♀️ Tipo de ruta (lineal/circular):\n\n' +
+      '📏 Distancia aproximada:\n\n' +
+      '⛰️ Dificultad (baja/media/alta):\n\n' +
+      '⏱️ Duración aproximada:\n\n' +
+      '💡 Recomendaciones (agua, calzado, etc.):\n',
+  },
+  {
+    id: 'playa',
+    label: 'Plantilla playa',
+    texto:
+      '🏖️ Tipo de playa (arena, roca, calas…):\n\n' +
+      '🌊 Oleaje y viento:\n\n' +
+      '🅿️ Aparcamiento / acceso:\n\n' +
+      '🍽️ Bares / chiringuitos cerca:\n\n' +
+      '✨ Truco personal:\n',
+  },
+];
 
 // Límite "blando" solo para avisar al usuario en el frontend.
 // No bloquea la subida: el backend es quien optimiza/limita realmente.
@@ -67,6 +93,19 @@ export default function EditorTarjeta() {
   const fileRef = useRef(null);
   const loadAbortRef = useRef(null);
   const uploadAbortRef = useRef(null);
+
+  const esEdicion = Boolean(id);
+
+  // 👉 helper para insertar emojis / texto en la descripción
+  const insertarTextoDescripcion = (trozo) => {
+    setForm((f) => ({
+      ...f,
+      descripcion:
+        (f.descripcion || '') +
+        (f.descripcion ? '\n' : '') +
+        trozo,
+    }));
+  };
 
   // Cargar tarjeta en modo edición
   const cargar = useCallback(async () => {
@@ -170,10 +209,9 @@ export default function EditorTarjeta() {
 
       // Añadir URL evitando duplicados (por si el usuario sube la misma varias veces)
       setForm((prev) => {
-        const set = new Set([
-          ...(prev.imagenes || []),
-          nueva,
-        ].filter(Boolean));
+        const set = new Set(
+          [...(prev.imagenes || []), nueva].filter(Boolean)
+        );
         return { ...prev, imagenes: Array.from(set) };
       });
     } catch (e2) {
@@ -276,8 +314,7 @@ export default function EditorTarjeta() {
         else if (err?.code === err.POSITION_UNAVAILABLE)
           msg = 'Ubicación no disponible.';
         else if (err?.code === err.TIMEOUT)
-          msg =
-            'Tiempo de espera agotado al obtener ubicación.';
+          msg = 'Tiempo de espera agotado al obtener ubicación.';
         setMensaje(msg);
         setLocating(false);
       },
@@ -345,16 +382,47 @@ export default function EditorTarjeta() {
     }
   };
 
+  const longitudDesc = form.descripcion.length;
+  const cercaLimite = longitudDesc > 900; // a partir de 900/1000 ponemos el numerito en rojo
+
   return (
     <div className="container py-4">
       <div className="row justify-content-center">
-        <div className="col-12 col-lg-8">
-          <div className="card shadow-sm border-0">
-            <div className="card-body">
-              <h1 className="h4 mb-3">
-                {id ? 'Editar' : 'Nueva'} tarjeta
-              </h1>
+        <div className="col-12 col-lg-9">
+          {/* Cabecera visual tipo “wizard” */}
+          <div className="mb-3">
+            <span className="badge rounded-pill text-bg-primary me-2">
+              {esEdicion ? 'Editar tarjeta' : 'Nueva tarjeta'}
+            </span>
+            <span className="badge rounded-pill text-bg-light text-muted">
+              Paso 1 · Detalles básicos
+            </span>
+          </div>
 
+          <div className="card shadow border-0">
+            {/* Cinta superior colorida */}
+            <div className="card-header border-0 bg-gradient bg-primary text-light py-3">
+              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                  <h1 className="h5 mb-1">
+                    {esEdicion ? 'Edita tu experiencia' : 'Comparte un lugar o experiencia'}
+                  </h1>
+                  <p className="mb-0 small text-light opacity-75">
+                    Añade un título claro, una buena foto y marca si es un lugar, ruta o experiencia.
+                  </p>
+                </div>
+                <div className="text-end small">
+                  <span className="d-block fw-semibold">
+                    Explora Huelva
+                  </span>
+                  <span className="text-light opacity-75">
+                    Tu mapa personal de recuerdos
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="card-body">
               {mensaje && (
                 <div
                   className="alert alert-danger"
@@ -365,98 +433,158 @@ export default function EditorTarjeta() {
                 </div>
               )}
 
-              <form onSubmit={enviar} className="row g-3" noValidate>
-                {/* Título */}
+              <form onSubmit={enviar} className="row g-4" noValidate>
+                {/* SECCIÓN 1: Información básica */}
                 <div className="col-12">
-                  <label
-                    className="form-label"
-                    htmlFor="campo-titulo"
-                  >
-                    Título{' '}
-                    <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    id="campo-titulo"
-                    className={`form-control ${
-                      !form.titulo.trim()
-                        ? 'is-invalid'
-                        : ''
-                    }`}
-                    name="titulo"
-                    value={form.titulo}
-                    onChange={cambiar}
-                    maxLength={120}
-                    required
-                    aria-invalid={!form.titulo.trim()}
-                    aria-describedby="ayuda-titulo"
-                  />
-                  <div id="ayuda-titulo" className="form-text">
-                    Sé claro y descriptivo. Máx. 120 caracteres.
-                  </div>
-                  {!form.titulo.trim() && (
-                    <div className="invalid-feedback">
-                      El título es obligatorio.
+                  <h2 className="h6 text-uppercase text-muted mb-2">
+                    1. Información básica
+                  </h2>
+                  <div className="row g-3">
+                    {/* Título */}
+                    <div className="col-12">
+                      <label
+                        className="form-label"
+                        htmlFor="campo-titulo"
+                      >
+                        Título <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        id="campo-titulo"
+                        className={`form-control ${
+                          !form.titulo.trim() ? 'is-invalid' : ''
+                        }`}
+                        name="titulo"
+                        value={form.titulo}
+                        onChange={cambiar}
+                        maxLength={120}
+                        required
+                        aria-invalid={!form.titulo.trim()}
+                        aria-describedby="ayuda-titulo"
+                        placeholder="Atardecer en la Punta del Sebo, ruta por el Andévalo..."
+                      />
+                      <div id="ayuda-titulo" className="form-text">
+                        Sé claro y descriptivo. Máx. 120 caracteres.
+                      </div>
+                      {!form.titulo.trim() && (
+                        <div className="invalid-feedback">
+                          El título es obligatorio.
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {/* Descripción con emojis + plantillas + contador */}
+                    <div className="col-12">
+                      <div className="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+                        <label
+                          className="form-label mb-0"
+                          htmlFor="campo-descripcion"
+                        >
+                          Descripción <span className="text-danger">*</span>
+                        </label>
+
+                        <div className="d-flex flex-wrap gap-2 align-items-center">
+                          {/* Emojis rápidos */}
+                          <div className="d-flex flex-wrap gap-1 small align-items-center">
+                            <span className="text-muted me-1">Emojis:</span>
+                            {EMOJIS_MODERNOS.map((em) => (
+                              <button
+                                key={em}
+                                type="button"
+                                className="btn btn-sm btn-light border-0"
+                                onClick={() => insertarTextoDescripcion(em)}
+                                title="Insertar emoji"
+                              >
+                                {em}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Plantillas rápidas */}
+                          <div className="small">
+                            <select
+                              className="form-select form-select-sm"
+                              defaultValue=""
+                              onChange={(e) => {
+                                const idPlat = e.target.value;
+                                if (!idPlat) return;
+                                const plat = PLANTILLAS_DESC.find(
+                                  (p) => p.id === idPlat
+                                );
+                                if (plat) {
+                                  insertarTextoDescripcion(plat.texto);
+                                }
+                                e.target.value = '';
+                              }}
+                            >
+                              <option value="">Plantillas…</option>
+                              {PLANTILLAS_DESC.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <textarea
+                        id="campo-descripcion"
+                        className={`form-control ${
+                          !form.descripcion.trim() ? 'is-invalid' : ''
+                        }`}
+                        rows={4}
+                        name="descripcion"
+                        value={form.descripcion}
+                        onChange={cambiar}
+                        maxLength={1000}
+                        required
+                        aria-invalid={!form.descripcion.trim()}
+                        aria-describedby="ayuda-descripcion"
+                        placeholder="Cuenta qué viste, cómo llegaste, trucos, mejores horas para ir..."
+                      />
+                      <div
+                        id="ayuda-descripcion"
+                        className="d-flex justify-content-between align-items-center mt-1"
+                      >
+                        <span className="form-text">
+                          Usa emojis y, si quieres, una plantilla para estructurar la experiencia.
+                        </span>
+                        <span
+                          className={`small ${
+                            cercaLimite ? 'text-danger fw-semibold' : 'text-muted'
+                          }`}
+                        >
+                          {longitudDesc} / 1000
+                        </span>
+                      </div>
+                      {!form.descripcion.trim() && (
+                        <div className="invalid-feedback">
+                          La descripción es obligatoria.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Descripción */}
+                {/* SECCIÓN 2: Imágenes */}
                 <div className="col-12">
-                  <label
-                    className="form-label"
-                    htmlFor="campo-descripcion"
-                  >
-                    Descripción{' '}
-                    <span className="text-danger">*</span>
-                  </label>
-                  <textarea
-                    id="campo-descripcion"
-                    className={`form-control ${
-                      !form.descripcion.trim()
-                        ? 'is-invalid'
-                        : ''
-                    }`}
-                    rows={4}
-                    name="descripcion"
-                    value={form.descripcion}
-                    onChange={cambiar}
-                    maxLength={1000}
-                    required
-                    aria-invalid={!form.descripcion.trim()}
-                    aria-describedby="ayuda-descripcion"
-                  />
-                  <div
-                    id="ayuda-descripcion"
-                    className="form-text"
-                  >
-                    Cuenta qué hace especial este lugar o
-                    experiencia. Máx. 1000 caracteres.
-                  </div>
-                  {!form.descripcion.trim() && (
-                    <div className="invalid-feedback">
-                      La descripción es obligatoria.
-                    </div>
-                  )}
-                </div>
-
-                {/* Imágenes */}
-                <div className="col-12">
+                  <h2 className="h6 text-uppercase text-muted mb-2">
+                    2. Imágenes
+                  </h2>
                   <div className="d-flex align-items-center justify-content-between">
                     <label className="form-label mb-0">
-                      Imágenes{' '}
-                      <span className="text-danger">*</span>
+                      Imágenes <span className="text-danger">*</span>
                     </label>
                     <div className="d-flex gap-2">
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline-secondary"
+                        className="btn btn-sm btn-outline-primary"
                         onClick={seleccionarArchivo}
                         disabled={subiendo}
                         title="Subir imagen"
                       >
-                        {subiendo
-                          ? 'Subiendo…'
-                          : 'Añadir imagen'}
+                        <i className="bi bi-cloud-arrow-up me-1" />
+                        {subiendo ? 'Subiendo…' : 'Añadir imagen'}
                       </button>
                       <input
                         ref={fileRef}
@@ -481,16 +609,16 @@ export default function EditorTarjeta() {
                           src={url}
                           alt=""
                           style={{
-                            width: 120,
-                            height: 80,
+                            width: 130,
+                            height: 90,
                             objectFit: 'cover',
-                            borderRadius: 6,
+                            borderRadius: 8,
                           }}
                           loading="lazy"
                           decoding="async"
+                          className="border"
                           onError={(e) => {
-                            e.currentTarget.style.display =
-                              'none';
+                            e.currentTarget.style.display = 'none';
                           }}
                         />
                         <button
@@ -505,133 +633,122 @@ export default function EditorTarjeta() {
                       </div>
                     ))}
                   </div>
+
                   {(form.imagenes || []).length === 0 && (
                     <div className="text-danger small mt-2">
                       Añade al menos una imagen.
                     </div>
                   )}
+
+                  <div className="alert alert-light border mt-3 small mb-0">
+                    <i className="bi bi-shield-check me-2" />
+                    Evita subir fotos con datos personales sensibles o de otras personas
+                    sin su consentimiento. Las imágenes se optimizan en el servidor para
+                    que la app vaya fluida.
+                  </div>
                 </div>
 
-                {/* ⛔ VÍDEO OCULTO (conservado para el futuro) */}
-                {/*
+                {/* SECCIÓN 3: Visibilidad y etiquetas */}
                 <div className="col-12">
-                  <label className="form-label">
-                    Vídeo (YouTube/Vimeo/MP4) <small className="text-muted">(opcional)</small>
-                  </label>
-                  <input
-                    className="form-control"
-                    name="videoUrl"
-                    value={form.videoUrl}
-                    onChange={cambiar}
-                    placeholder="https://youtu.be/... o https://.../video.mp4"
-                  />
-                </div>
-                */}
-
-                {/* Visibilidad */}
-                <div className="col-12 col-md-4">
-                  <label
-                    className="form-label"
-                    htmlFor="sel-visibilidad"
-                  >
-                    Visibilidad{' '}
-                    <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    id="sel-visibilidad"
-                    className={`form-select ${
-                      !OPCIONES_VISIBILIDAD.includes(
-                        form.visibilidad
-                      )
-                        ? 'is-invalid'
-                        : ''
-                    }`}
-                    name="visibilidad"
-                    value={form.visibilidad}
-                    onChange={cambiar}
-                    required
-                    aria-invalid={
-                      !OPCIONES_VISIBILIDAD.includes(
-                        form.visibilidad
-                      )
-                    }
-                  >
-                    <option value="privado">
-                      Privado
-                    </option>
-                    <option value="publico">
-                      Público
-                    </option>
-                    <option value="amigos">
-                      Amigos
-                    </option>
-                  </select>
-                  {!OPCIONES_VISIBILIDAD.includes(
-                    form.visibilidad
-                  ) && (
-                    <div className="invalid-feedback">
-                      Selecciona una visibilidad.
-                    </div>
-                  )}
-                </div>
-
-                {/* Etiquetas */}
-                <div className="col-12 col-md-8">
-                  <fieldset>
-                    <legend className="form-label mb-2">
-                      Etiquetas{' '}
-                      <span className="text-danger">*</span>
-                    </legend>
-                    <div className="d-flex gap-3 flex-wrap">
-                      {OPCIONES_ETIQUETAS.map((tag) => (
-                        <div
-                          className="form-check"
-                          key={tag}
-                        >
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            id={`chk-${tag}`}
-                            checked={form.etiquetas.includes(
-                              tag
-                            )}
-                            onChange={() =>
-                              toggleEtiqueta(tag)
-                            }
-                            aria-describedby="ayuda-etiquetas"
-                          />
-                          <label
-                            className="form-check-label"
-                            htmlFor={`chk-${tag}`}
-                          >
-                            {tag}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <div
-                      id="ayuda-etiquetas"
-                      className="form-text"
-                    >
-                      Elige al menos una categoría.
-                    </div>
-                    {(form.etiquetas || []).length === 0 && (
-                      <div className="text-danger small mt-1">
-                        Selecciona al menos una etiqueta.
+                  <h2 className="h6 text-uppercase text-muted mb-2">
+                    3. Visibilidad y etiquetas
+                  </h2>
+                  <div className="row g-3 align-items-start">
+                    {/* Visibilidad */}
+                    <div className="col-12 col-md-4">
+                      <label
+                        className="form-label"
+                        htmlFor="sel-visibilidad"
+                      >
+                        Visibilidad <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        id="sel-visibilidad"
+                        className={`form-select ${
+                          !OPCIONES_VISIBILIDAD.includes(form.visibilidad)
+                            ? 'is-invalid'
+                            : ''
+                        }`}
+                        name="visibilidad"
+                        value={form.visibilidad}
+                        onChange={cambiar}
+                        required
+                        aria-invalid={
+                          !OPCIONES_VISIBILIDAD.includes(form.visibilidad)
+                        }
+                      >
+                        <option value="privado">Privado</option>
+                        <option value="publico">Público</option>
+                        <option value="amigos">Amigos</option>
+                      </select>
+                      <div className="form-text">
+                        Elige quién puede ver esta tarjeta en Explora Huelva.
                       </div>
-                    )}
-                  </fieldset>
+                      {!OPCIONES_VISIBILIDAD.includes(form.visibilidad) && (
+                        <div className="invalid-feedback">
+                          Selecciona una visibilidad.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Etiquetas */}
+                    <div className="col-12 col-md-8">
+                      <fieldset>
+                        <legend className="form-label mb-2">
+                          Etiquetas <span className="text-danger">*</span>
+                        </legend>
+                        <div className="d-flex gap-3 flex-wrap">
+                          {OPCIONES_ETIQUETAS.map((tag) => (
+                            <div
+                              className="form-check form-check-inline"
+                              key={tag}
+                            >
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`chk-${tag}`}
+                                checked={form.etiquetas.includes(tag)}
+                                onChange={() => toggleEtiqueta(tag)}
+                                aria-describedby="ayuda-etiquetas"
+                              />
+                              <label
+                                className="form-check-label text-capitalize"
+                                htmlFor={`chk-${tag}`}
+                              >
+                                {tag}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                        <div
+                          id="ayuda-etiquetas"
+                          className="form-text"
+                        >
+                          Esto ayuda a clasificar tu tarjeta en el buscador
+                          (Lugares, Rutas, Experiencias).
+                        </div>
+                        {(form.etiquetas || []).length === 0 && (
+                          <div className="text-danger small mt-1">
+                            Selecciona al menos una etiqueta.
+                          </div>
+                        )}
+                      </fieldset>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Ubicación — dejamos SOLO el botón (inputs lat/lng ocultos) */}
+                {/* SECCIÓN 4: Ubicación */}
                 <div className="col-12">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <label className="form-label mb-1">
-                      Ubicación{' '}
-                      <small className="text-muted">
-                        (opcional)
-                      </small>
-                    </label>
+                  <h2 className="h6 text-uppercase text-muted mb-2">
+                    4. Ubicación (opcional)
+                  </h2>
+                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                      <p className="mb-1 small text-muted">
+                        Asocia la tarjeta a tu posición actual para verla en el
+                        mapa de Explora Huelva.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       className="btn btn-sm btn-outline-success"
@@ -640,17 +757,13 @@ export default function EditorTarjeta() {
                       title="Usar mi ubicación actual"
                       aria-live="polite"
                     >
-                      {locating
-                        ? 'Obteniendo…'
-                        : 'Usar mi ubicación'}
+                      <i className="bi bi-geo-alt me-1" />
+                      {locating ? 'Obteniendo…' : 'Usar mi ubicación'}
                     </button>
                   </div>
 
-                  {/* Inputs lat/lng siguen existiendo en el estado,
-                      pero no se muestran en el formulario. */}
-
                   {accuracy != null && (
-                    <div className="form-text">
+                    <div className="form-text mt-1">
                       Precisión aprox.: ±{accuracy} m
                     </div>
                   )}
@@ -658,39 +771,41 @@ export default function EditorTarjeta() {
                   {!ubicacionOk && (
                     <div className="text-danger small mt-1">
                       Si indicas ubicación, debes rellenar{' '}
-                      <strong>lat</strong> y{' '}
-                      <strong>lng</strong> con valores
+                      <strong>lat</strong> y <strong>lng</strong> con valores
                       válidos.
                     </div>
                   )}
                 </div>
 
                 {/* Acciones */}
-                <div className="col-12 d-flex gap-2">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={
-                      guardando ||
-                      subiendo ||
-                      !obligatorioOk ||
-                      !ubicacionOk
-                    }
-                    aria-busy={guardando}
-                  >
-                    {guardando
-                      ? 'Guardando…'
-                      : 'Guardar'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => navigate(-1)}
-                    disabled={guardando}
-                    title="Volver atrás"
-                  >
-                    Cancelar
-                  </button>
+                <div className="col-12 d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                  <div className="d-flex gap-2">
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={
+                        guardando ||
+                        subiendo ||
+                        !obligatorioOk ||
+                        !ubicacionOk
+                      }
+                      aria-busy={guardando}
+                    >
+                      {guardando ? 'Guardando…' : 'Guardar tarjeta'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => navigate(-1)}
+                      disabled={guardando}
+                      title="Volver atrás"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  <span className="small text-muted mt-2 mt-md-0">
+                    Los campos marcados con <span className="text-danger">*</span> son obligatorios.
+                  </span>
                 </div>
               </form>
             </div>

@@ -1,3 +1,4 @@
+// src/componentes/Navegacion.jsx
 // Barra de navegación superior con estado de sesión (Entrar / Panel + Salir)
 
 import { Link, NavLink, useNavigate } from "react-router-dom";
@@ -10,12 +11,17 @@ export default function Navegacion() {
   // Cierra el menú colapsable (útil en móvil) cuando se pulsa un link/botón
   const closeMenu = useCallback(() => {
     const collapse = document.getElementById("menu");
-    // Usa window.bootstrap (lo inyecta main.jsx)
-    if (collapse?.classList.contains("show") && window.bootstrap) {
-      const bsCollapse =
+    if (!collapse) return;
+
+    // 1) Forzar eliminar manualmente la clase "show"
+    collapse.classList.remove("show");
+
+    // 2) Intentar cerrar usando la instancia de Bootstrap (si existe)
+    if (window.bootstrap?.Collapse) {
+      const instance =
         window.bootstrap.Collapse.getInstance(collapse) ||
         new window.bootstrap.Collapse(collapse, { toggle: false });
-      bsCollapse.hide();
+      instance.hide();
     }
   }, []);
 
@@ -55,8 +61,12 @@ export default function Navegacion() {
               <NavLink
                 to="/"
                 end
-                className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
-                aria-current={({ isActive }) => (isActive ? "page" : undefined)}
+                className={({ isActive }) =>
+                  "nav-link" + (isActive ? " active" : "")
+                }
+                aria-current={({ isActive }) =>
+                  isActive ? "page" : undefined
+                }
                 onClick={closeMenu}
               >
                 Inicio
@@ -65,17 +75,35 @@ export default function Navegacion() {
 
             {/* Secciones públicas */}
             <li className="nav-item">
-              <NavLink to="/explorar/lugares" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} onClick={closeMenu}>
+              <NavLink
+                to="/explorar/lugares"
+                className={({ isActive }) =>
+                  "nav-link" + (isActive ? " active" : "")
+                }
+                onClick={closeMenu}
+              >
                 Lugares
               </NavLink>
             </li>
             <li className="nav-item">
-              <NavLink to="/explorar/experiencias" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} onClick={closeMenu}>
+              <NavLink
+                to="/explorar/experiencias"
+                className={({ isActive }) =>
+                  "nav-link" + (isActive ? " active" : "")
+                }
+                onClick={closeMenu}
+              >
                 Experiencias
               </NavLink>
             </li>
             <li className="nav-item">
-              <NavLink to="/explorar/rutas" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} onClick={closeMenu}>
+              <NavLink
+                to="/explorar/rutas"
+                className={({ isActive }) =>
+                  "nav-link" + (isActive ? " active" : "")
+                }
+                onClick={closeMenu}
+              >
                 Rutas
               </NavLink>
             </li>
@@ -83,12 +111,22 @@ export default function Navegacion() {
             {autenticado ? (
               <>
                 <li className="nav-item">
-                  <NavLink to="/panel" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} onClick={closeMenu}>
+                  <NavLink
+                    to="/panel"
+                    className={({ isActive }) =>
+                      "nav-link" + (isActive ? " active" : "")
+                    }
+                    onClick={closeMenu}
+                  >
                     Panel
                   </NavLink>
                 </li>
                 <li className="nav-item ms-lg-3">
-                  <button type="button" className="btn btn-outline-light" onClick={salir}>
+                  <button
+                    type="button"
+                    className="btn btn-outline-light"
+                    onClick={salir}
+                  >
                     <i className="bi bi-box-arrow-right me-1"></i> Salir
                   </button>
                 </li>
@@ -96,7 +134,11 @@ export default function Navegacion() {
             ) : (
               <>
                 <li className="nav-item ms-lg-3">
-                  <Link to="/login" className="btn btn-primary" onClick={closeMenu}>
+                  <Link
+                    to="/login"
+                    className="btn btn-primary"
+                    onClick={closeMenu}
+                  >
                     <i className="bi bi-person-circle me-1"></i> Entrar
                   </Link>
                 </li>

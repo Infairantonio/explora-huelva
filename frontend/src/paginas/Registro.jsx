@@ -1,3 +1,4 @@
+// src/paginas/Registro.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { register } from "../servicios/api";
@@ -6,10 +7,14 @@ export default function Registro() {
   const [nombre, setNombre] = useState("");
   const [email, setEmail]   = useState("");
   const [password, setPassword] = useState("");
+
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje]   = useState("");
 
-  // NUEVO: paso de UI y soporte de reenviar
+  // NUEVO: aceptación legal
+  const [aceptaLegal, setAceptaLegal] = useState(false);
+
+  // NUEVO: paso de UI
   const [paso, setPaso] = useState("form"); // form | enviado
   const [cuentaEmail, setCuentaEmail] = useState("");
   const [reenviando, setReenviando] = useState(false);
@@ -25,14 +30,13 @@ export default function Registro() {
     setCargando(true);
 
     try {
-      const data = await register({ nombre, email, password }); // NO guarda token
+      const data = await register({ nombre, email, password });
+
       if (data?.ok && data?.necesitaVerificar) {
-        // ✅ En lugar de ir a /verifica sin token, mostramos pantalla de "correo enviado"
         setCuentaEmail(email);
         setPaso("enviado");
         setInfo("Te enviamos un correo con un enlace para verificar tu cuenta. Revisa también Spam.");
       } else if (data?.ok && data?.token) {
-        // Fallback si en algún entorno emites token en el registro
         navigate("/panel", { replace: true });
       } else {
         throw new Error("No se pudo completar el registro");
@@ -41,7 +45,8 @@ export default function Registro() {
       const detalle =
         err?.payload?.mensaje ||
         (Array.isArray(err?.payload?.errores) && err.payload.errores[0]?.msg) ||
-        err?.message || "Error al registrar";
+        err?.message ||
+        "Error al registrar";
       setMensaje("❌ " + detalle);
     } finally {
       setCargando(false);
@@ -54,16 +59,19 @@ export default function Registro() {
       setReenviando(true);
       setInfo(null);
       setMensaje("");
+
       const correo = (cuentaEmail || email || "").trim();
       const res = await fetch("/api/auth/reenviar-verificacion", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: correo }),
       });
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
         throw new Error(data?.mensaje || "No se pudo reenviar el correo.");
       }
+
       setInfo("Hemos reenviado el correo de verificación. Revisa tu bandeja.");
     } catch (e) {
       setMensaje("❌ " + (e?.message || "Error al reenviar verificación."));
@@ -96,30 +104,51 @@ export default function Registro() {
             </div>
             <div className="card auth-card shadow border-0 ms-auto">
               <div className="card-body">
-                <h1 className="card-title fw-bold text-primary mb-3">Verifica tu correo</h1>
+                <h1 className="card-title fw-bold text-primary mb-3">
+                  Verifica tu correo
+                </h1>
+
                 {info && <div className="alert alert-info">{info}</div>}
                 {mensaje && <div className="alert alert-danger">{mensaje}</div>}
+
                 <p className="mb-2">Enviamos un enlace de verificación a:</p>
                 <p className="fw-bold">{correo || "(tu correo)"}</p>
+
                 <ul className="small text-muted">
-                  <li>Abre el correo y pulsa <strong>“Verificar mi cuenta”</strong>.</li>
-                  <li>Si no lo ves, revisa la carpeta <strong>Spam</strong> o <strong>No deseado</strong>.</li>
-                  <li>El enlace caduca en <strong>24 horas</strong>.</li>
+                  <li>Pulsa <strong>“Verificar mi cuenta”</strong> en el email.</li>
+                  <li>Revisa también <strong>Spam</strong> o <strong>No deseado</strong>.</li>
+                  <li>El enlace es válido durante <strong>24 horas</strong>.</li>
                 </ul>
+
                 <div className="d-flex align-items-center gap-2 mt-2">
-                  <button className="btn btn-secondary" onClick={reenviar} disabled={reenviando}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={reenviar}
+                    disabled={reenviando}
+                  >
                     {reenviando ? "Reenviando…" : "Reenviar verificación"}
                   </button>
+
                   {abrirBuzon && (
-                    <a className="btn btn-outline-primary" href={abrirBuzon} target="_blank" rel="noreferrer">
+                    <a
+                      className="btn btn-outline-primary"
+                      href={abrirBuzon}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       Abrir mi correo
                     </a>
                   )}
-                  <Link to="/login" className="btn btn-link ms-auto">Ir a iniciar sesión</Link>
+
+                  <Link to="/login" className="btn btn-link ms-auto">
+                    Ir a iniciar sesión
+                  </Link>
                 </div>
+
                 <hr />
                 <p className="small mb-0">
-                  ¿Problemas? Puedes solicitar otro enlace más tarde desde <Link to="/olvide">“¿Olvidaste tu contraseña?”</Link>.
+                  Si no te llega, también puedes pedir otro enlace desde{" "}
+                  <Link to="/olvide">“¿Olvidaste tu contraseña?”</Link>.
                 </p>
               </div>
             </div>
@@ -129,7 +158,7 @@ export default function Registro() {
     );
   }
 
-  // Pantalla de formulario (lo que ya tenías)
+  // FORMULARIO DE REGISTRO
   return (
     <div className="auth-wrap">
       <div className="container">
@@ -138,10 +167,15 @@ export default function Registro() {
             <h2>Explora Huelva</h2>
             <p>Crea tu cuenta en un minuto.</p>
           </div>
+
           <div className="card auth-card shadow border-0 ms-auto">
             <div className="card-body">
-              <h1 className="card-title fw-bold text-primary mb-3">Crear cuenta</h1>
+              <h1 className="card-title fw-bold text-primary mb-3">
+                Crear cuenta
+              </h1>
+
               {mensaje && <div className="alert alert-info">{mensaje}</div>}
+
               <form onSubmit={enviar} noValidate>
                 <div className="mb-3">
                   <label className="form-label">Nombre</label>
@@ -150,7 +184,7 @@ export default function Registro() {
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
                     required
-                    minLength={2} // igual que el backend
+                    minLength={2}
                   />
                 </div>
 
@@ -175,22 +209,55 @@ export default function Registro() {
                     required
                   />
                   <div className="form-text">
-                    Debe ser fuerte: mínimo 10 caracteres, mayúsculas/minúsculas, números y símbolos.
+                    Debe tener mínimo 10 caracteres y ser segura.
                   </div>
+                </div>
+
+                {/* ✅ NUEVO: Checkbox de aceptación legal */}
+                <div className="form-check mb-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="aceptaLegal"
+                    checked={aceptaLegal}
+                    onChange={(e) => setAceptaLegal(e.target.checked)}
+                    required
+                  />
+                  <label className="form-check-label small" htmlFor="aceptaLegal">
+                    He leído y acepto la{" "}
+                    <Link to="/privacidad" target="_blank">
+                      Política de Privacidad
+                    </Link>{" "}
+                    y los{" "}
+                    <Link to="/terminos" target="_blank">
+                      Términos y Condiciones
+                    </Link>.
+                  </label>
                 </div>
 
                 <div className="d-flex align-items-center gap-2">
                   <button
                     className="btn btn-primary px-4"
-                    disabled={cargando || !nombre || !email || !password}
+                    disabled={
+                      cargando ||
+                      !nombre ||
+                      !email ||
+                      !password ||
+                      !aceptaLegal
+                    }
                   >
                     {cargando ? "Creando…" : "Crear cuenta"}
                   </button>
-                  <Link to="/login" className="btn btn-link">Ya tengo cuenta</Link>
+
+                  <Link to="/login" className="btn btn-link">
+                    Ya tengo cuenta
+                  </Link>
                 </div>
+
               </form>
             </div>
           </div>
+
         </div>
       </div>
     </div>

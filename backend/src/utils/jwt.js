@@ -15,10 +15,12 @@ const getIssuer = () => process.env.JWT_ISSUER || undefined;
 const getAudience = () => process.env.JWT_AUDIENCE || undefined;
 
 // Payload mínimo que usamos en toda la app
+// 👇 Ahora incluye también el ROL
 export const buildUserPayload = (usuario) => ({
   uid: String(usuario._id || usuario.id || ''), // normaliza a string
   nombre: usuario.nombre,
   email: usuario.email,
+  rol: usuario.rol || 'usuario',
 });
 
 // Firma un JWT con opciones (exp por defecto: 7d)

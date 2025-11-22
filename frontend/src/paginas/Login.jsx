@@ -1,12 +1,16 @@
 // src/paginas/Login.jsx
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
+import {
+  useNavigate,
+  useSearchParams,
+  useLocation,
+  Link,
+} from "react-router-dom";
 import { login, getPerfil } from "../servicios/api";
-import { soyAdmin } from "../servicios/adminTarjetas";
 
 export default function Login() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(true);
   const [remember, setRemember] = useState(true);
 
   const [cargando, setCargando] = useState(false);
@@ -19,15 +23,16 @@ export default function Login() {
   const next = params.get("next") || "/panel";
   const fromState = location.state?.from?.pathname;
 
-  const irSegunPermisos = async () => {
-    try {
-      const esAdmin = await soyAdmin();
-      if (esAdmin) {
-        navigate("/admin/tarjetas", { replace: true });
-      } else {
-        navigate(fromState || next, { replace: true });
-      }
-    } catch {
+  // 👉 Decide a dónde ir según el rol del usuario
+  const irSegunPermisos = (perfil) => {
+    const rol =
+      perfil?.usuario?.rol ||
+      perfil?.rol ||
+      ""; // por si cambia la forma de respuesta
+
+    if (rol === "admin") {
+      navigate("/admin/tarjetas", { replace: true });
+    } else {
       navigate(fromState || next, { replace: true });
     }
   };
@@ -37,9 +42,11 @@ export default function Login() {
     (async () => {
       try {
         const me = await getPerfil();
-        if (me?.ok) await irSegunPermisos();
+        if (me?.ok) {
+          irSegunPermisos(me);
+        }
       } catch {
-        /* no autorizado */
+        /* no autorizado, seguimos en login */
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,12 +70,16 @@ export default function Login() {
     try {
       const data = await login({ email, password, remember });
       if (!data?.ok) throw new Error("Credenciales incorrectas");
-      await irSegunPermisos();
+
+      // 🔁 Después del login, pedimos el perfil y miramos el rol
+      const perfil = await getPerfil();
+      irSegunPermisos(perfil);
     } catch (err) {
       const raw = err?.message || "";
       let msg = raw || "Error al iniciar sesión";
       if (/403/.test(raw) || /verific/i.test(raw))
-        msg = "Tu email no está verificado. Revisa tu correo o solicita un nuevo enlace.";
+        msg =
+          "Tu email no está verificado. Revisa tu correo o solicita un nuevo enlace.";
       else if (/401/.test(raw))
         msg = "Credenciales inválidas. Revisa tu email y contraseña.";
       setMensaje("❌ " + msg);
@@ -88,13 +99,17 @@ export default function Login() {
 
           <div className="card auth-card shadow border-0 ms-auto">
             <div className="card-body">
-              <h1 className="card-title fw-bold text-primary mb-3">Iniciar sesión</h1>
+              <h1 className="card-title fw-bold text-primary mb-3">
+                Iniciar sesión
+              </h1>
 
               {mensaje && <div className="alert alert-info">{mensaje}</div>}
 
               <form onSubmit={enviar} noValidate>
                 <div className="mb-3">
-                  <label htmlFor="email" className="form-label">Email</label>
+                  <label htmlFor="email" className="form-label">
+                    Email
+                  </label>
                   <input
                     id="email"
                     className="form-control"
@@ -109,7 +124,9 @@ export default function Login() {
                 </div>
 
                 <div className="mb-3">
-                  <label htmlFor="password" className="form-label">Contraseña</label>
+                  <label htmlFor="password" className="form-label">
+                    Contraseña
+                  </label>
                   <input
                     id="password"
                     className="form-control"
@@ -142,8 +159,12 @@ export default function Login() {
                   >
                     {cargando ? "Entrando…" : "Entrar"}
                   </button>
-                  <Link to="/registro" className="btn btn-outline-primary">Crear cuenta</Link>
-                  <Link to="/" className="btn btn-link">Volver</Link>
+                  <Link to="/registro" className="btn btn-outline-primary">
+                    Crear cuenta
+                  </Link>
+                  <Link to="/" className="btn btn-link">
+                    Volver
+                  </Link>
                 </div>
 
                 <div className="mt-3">

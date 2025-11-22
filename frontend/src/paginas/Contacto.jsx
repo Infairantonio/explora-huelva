@@ -1,134 +1,205 @@
 // src/paginas/Contacto.jsx
 import { useState } from "react";
+import { API_URL } from "../servicios/api";
 
 export default function Contacto() {
-  const [form, setForm] = useState({ nombre: "", email: "", asunto: "", mensaje: "" });
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [mensaje, setMensaje] = useState("");
 
-  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const [enviando, setEnviando] = useState(false);
+  const [okMsg, setOkMsg] = useState("");
+  const [errMsg, setErrMsg] = useState("");
 
-  const onSubmit = (e) => {
+  const enviar = async (e) => {
     e.preventDefault();
-    // De momento estático: solo mostramos un aviso.
-    alert("¡Gracias! Hemos recibido tu mensaje (demo).");
-    setForm({ nombre: "", email: "", asunto: "", mensaje: "" });
+    setOkMsg("");
+    setErrMsg("");
+
+    if (!nombre.trim() || !email.trim() || !mensaje.trim()) {
+      setErrMsg("Por favor, rellena todos los campos.");
+      return;
+    }
+
+    setEnviando(true);
+    try {
+      const res = await fetch(`${API_URL}/contacto`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nombre: nombre.trim(),
+          email: email.trim(),
+          mensaje: mensaje.trim(),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.mensaje || "No se pudo enviar el mensaje.";
+        throw new Error(msg);
+      }
+
+      setOkMsg("Mensaje enviado correctamente. ¡Gracias por escribir! 😊");
+      setNombre("");
+      setEmail("");
+      setMensaje("");
+    } catch (err) {
+      setErrMsg(err.message || "Error al enviar el mensaje.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
-    <div className="bg-light">
-      <header className="bg-white border-bottom">
-        <div className="container py-5">
-          <h1 className="display-6 fw-bold mb-2">Contacto</h1>
-          <p className="text-muted mb-0">
-            ¿Tienes dudas, propuestas o incidencias? Escríbenos y te responderemos lo antes posible.
-          </p>
-        </div>
-      </header>
+    <main className="container py-4" role="main">
+      <div className="row justify-content-center">
+        <div className="col-12 col-lg-10">
+          {/* Cabecera */}
+          <header className="mb-4">
+            <h1 className="h3 fw-bold mb-2">Contacto</h1>
+            <p className="text-muted mb-0">
+              Si tienes dudas, propuestas de rutas o ideas para Explora Huelva,
+              puedes escribirnos por este formulario o por los medios de contacto.
+            </p>
+          </header>
 
-      <section className="container py-5">
-        <div className="row g-4">
-          {/* Datos de contacto */}
-          <div className="col-12 col-lg-4">
-            <div className="card border-0 shadow-sm">
-              <div className="card-body">
-                <h2 className="h6 text-uppercase text-secondary mb-3">Información</h2>
-                <p className="mb-2">
-                  <i className="bi bi-envelope me-2" />
-                  soporte@explorahuelva.demo
-                </p>
-                <p className="mb-2">
-                  <i className="bi bi-geo-alt me-2" />
-                  Huelva, España
-                </p>
-                <p className="mb-0">
-                  <i className="bi bi-clock me-2" />
-                  L-V · 9:00–18:00
-                </p>
+          <div className="row g-4">
+            {/* Datos de contacto directos */}
+            <section className="col-12 col-md-5">
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <h2 className="h5 mb-3">Cómo puedes encontrarnos</h2>
 
-                <hr className="my-4" />
-                <h3 className="h6 text-uppercase text-secondary mb-3">Redes</h3>
-                <div className="d-flex flex-wrap gap-2">
-                  <a className="btn btn-outline-secondary btn-sm" href="https://www.instagram.com" target="_blank" rel="noreferrer">
-                    <i className="bi bi-instagram me-1" /> Instagram
-                  </a>
-                  <a className="btn btn-outline-secondary btn-sm" href="https://twitter.com" target="_blank" rel="noreferrer">
-                    <i className="bi bi-twitter me-1" /> Twitter
-                  </a>
-                  <a className="btn btn-outline-secondary btn-sm" href="https://www.facebook.com" target="_blank" rel="noreferrer">
-                    <i className="bi bi-facebook me-1" /> Facebook
-                  </a>
+                  <ul className="list-unstyled mb-3">
+                    <li className="mb-3 d-flex align-items-start gap-2">
+                      <i className="bi bi-envelope-open text-primary mt-1" />
+                      <div>
+                        <div className="fw-semibold">Correo electrónico</div>
+                        <a
+                          href="mailto:hola@explorahuelva.test"
+                          className="link-primary link-offset-1"
+                        >
+                          hola@explorahuelva.test
+                        </a>
+                      </div>
+                    </li>
+
+                    <li className="mb-3 d-flex align-items-start gap-2">
+                      <i className="bi bi-whatsapp text-success mt-1" />
+                      <div>
+                        <div className="fw-semibold">WhatsApp (solo mensajes)</div>
+                        <a
+                          href="https://wa.me/34600000000"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="link-primary link-offset-1"
+                        >
+                          +34 600 00 00 00
+                        </a>
+                      </div>
+                    </li>
+
+                    <li className="mb-3 d-flex align-items-start gap-2">
+                      <i className="bi bi-instagram text-danger mt-1" />
+                      <div>
+                        <div className="fw-semibold">Instagram</div>
+                        <a
+                          href="https://www.instagram.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="link-primary link-offset-1"
+                        >
+                          @explorahuelva
+                        </a>
+                      </div>
+                    </li>
+                  </ul>
+
+                  <p className="small text-muted mb-0">
+                    Normalmente respondemos en un plazo de 24-48 horas laborables.
+                  </p>
                 </div>
               </div>
-            </div>
-          </div>
+            </section>
 
-          {/* Formulario (demo) */}
-          <div className="col-12 col-lg-8">
-            <div className="card border-0 shadow-sm">
-              <div className="card-body">
-                <h2 className="h6 text-uppercase text-secondary mb-3">Envíanos un mensaje</h2>
-                <form className="row g-3" onSubmit={onSubmit}>
-                  <div className="col-md-6">
-                    <label className="form-label">Nombre</label>
-                    <input
-                      name="nombre"
-                      value={form.nombre}
-                      onChange={onChange}
-                      type="text"
-                      className="form-control"
-                      placeholder="Tu nombre"
-                      required
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Email</label>
-                    <input
-                      name="email"
-                      value={form.email}
-                      onChange={onChange}
-                      type="email"
-                      className="form-control"
-                      placeholder="tucorreo@ejemplo.com"
-                      required
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label">Asunto</label>
-                    <input
-                      name="asunto"
-                      value={form.asunto}
-                      onChange={onChange}
-                      type="text"
-                      className="form-control"
-                      placeholder="Motivo del mensaje"
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label">Mensaje</label>
-                    <textarea
-                      name="mensaje"
-                      value={form.mensaje}
-                      onChange={onChange}
-                      className="form-control"
-                      rows={5}
-                      placeholder="Cuéntanos en qué podemos ayudarte"
-                      required
-                    />
-                  </div>
-                  <div className="col-12 d-flex justify-content-end">
-                    <button className="btn btn-primary">
-                      <i className="bi bi-send me-1" /> Enviar (demo)
+            {/* Formulario de contacto REAL (via backend) */}
+            <section className="col-12 col-md-7">
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <h2 className="h5 mb-3">Escríbenos un mensaje</h2>
+                  <p className="text-muted">
+                    Tu mensaje se enviará a nuestro correo de contacto.
+                  </p>
+
+                  {okMsg && (
+                    <div className="alert alert-success py-2">{okMsg}</div>
+                  )}
+                  {errMsg && (
+                    <div className="alert alert-danger py-2">{errMsg}</div>
+                  )}
+
+                  <form onSubmit={enviar} noValidate>
+                    <div className="mb-3">
+                      <label htmlFor="contacto-nombre" className="form-label">
+                        Nombre
+                      </label>
+                      <input
+                        id="contacto-nombre"
+                        type="text"
+                        className="form-control"
+                        value={nombre}
+                        onChange={(e) => setNombre(e.target.value)}
+                        required
+                        disabled={enviando}
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <label htmlFor="contacto-email" className="form-label">
+                        Correo electrónico
+                      </label>
+                      <input
+                        id="contacto-email"
+                        type="email"
+                        className="form-control"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={enviando}
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <label htmlFor="contacto-mensaje" className="form-label">
+                        Mensaje
+                      </label>
+                      <textarea
+                        id="contacto-mensaje"
+                        className="form-control"
+                        rows={4}
+                        value={mensaje}
+                        onChange={(e) => setMensaje(e.target.value)}
+                        required
+                        disabled={enviando}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={enviando}
+                    >
+                      {enviando ? "Enviando..." : "Enviar mensaje"}
                     </button>
-                  </div>
-                </form>
-
-                <div className="text-muted small mt-3">
-                  * Esta página es una demostración: el formulario no envía datos a un servidor todavía.
+                  </form>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </main>
   );
 }

@@ -7,10 +7,11 @@
 // - Verificación de email (token + caducidad).
 // - Reset de contraseña (token + caducidad).
 // - Controles anti-fuerza bruta (intentos fallidos + bloqueo temporal).
+// - Campos extra para gestión desde el panel de administración.
 // ————————————————————————————————————————————————————————
 
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const { Schema } = mongoose;
 
@@ -26,7 +27,7 @@ const UsuarioSchema = new Schema(
       trim: true,
       validate: {
         validator: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-        message: 'Email no válido',
+        message: "Email no válido",
       },
     },
 
@@ -36,8 +37,8 @@ const UsuarioSchema = new Schema(
     // Rol del usuario
     rol: {
       type: String,
-      enum: ['usuario', 'admin'],
-      default: 'usuario',
+      enum: ["usuario", "admin"],
+      default: "usuario",
       index: true,
     },
 
@@ -53,6 +54,18 @@ const UsuarioSchema = new Schema(
     // —— Anti-fuerza bruta / bloqueo temporal ——
     failedLoginCount: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null, index: true },
+
+    // —— Gestión desde panel admin ——
+    // Bloqueo manual (además del bloqueo automático por intentos)
+    bloqueado: { type: Boolean, default: false },
+
+    // Soft delete (no se borra físicamente de la BD)
+    eliminado: { type: Boolean, default: false },
+    eliminadoMotivo: { type: String, trim: true, maxlength: 500 },
+    eliminadoEn: { type: Date, default: null },
+
+    // Información opcional: último login correcto
+    lastLoginAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -60,6 +73,7 @@ const UsuarioSchema = new Schema(
       virtuals: true,
       versionKey: false,
       transform: (_doc, ret) => {
+        // Nunca exponer estos campos al frontend
         delete ret.passwordHash;
         delete ret.verificationToken;
         delete ret.verificationExpires;
@@ -87,7 +101,10 @@ UsuarioSchema.methods.validatePassword = function (plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
 
-UsuarioSchema.methods.startLoginLockIfNeeded = function (maxFallos = 5, minutosBloqueo = 10) {
+UsuarioSchema.methods.startLoginLockIfNeeded = function (
+  maxFallos = 5,
+  minutosBloqueo = 10
+) {
   this.failedLoginCount = (this.failedLoginCount || 0) + 1;
   if (this.failedLoginCount >= maxFallos) {
     const d = new Date();
@@ -103,7 +120,9 @@ UsuarioSchema.methods.resetLoginLock = function () {
 };
 
 UsuarioSchema.methods.isLocked = function () {
+  // bloqueado manualmente o por lockUntil
+  if (this.bloqueado) return true;
   return this.lockUntil && this.lockUntil > new Date();
 };
 
-export default mongoose.models.Usuario || mongoose.model('Usuario', UsuarioSchema);
+export default mongoose.models.Usuario || mongoose.model("Usuario", UsuarioSchema);

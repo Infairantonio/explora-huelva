@@ -217,6 +217,11 @@ export async function mias(req, res) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
+        // NUEVO: traemos también el usuario con su nombre (para mostrar "creado por")
+        .populate({
+          path: 'usuario',
+          select: 'nombre _id',
+        })
         .lean(),
       Tarjeta.countDocuments(filtro),
     ]);
@@ -253,6 +258,11 @@ export async function publicas(req, res) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
+        // NUEVO: incluimos el usuario con su nombre para las tarjetas públicas
+        .populate({
+          path: 'usuario',
+          select: 'nombre _id',
+        })
         .lean(),
       Tarjeta.countDocuments(filtro),
     ]);
@@ -314,6 +324,11 @@ export async function amigos(req, res) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
+        // NUEVO: traemos nombre del usuario creador también en las tarjetas de amigos
+        .populate({
+          path: 'usuario',
+          select: 'nombre _id',
+        })
         .lean(),
       Tarjeta.countDocuments(filtro),
     ]);
@@ -338,7 +353,14 @@ export async function publicaUna(req, res) {
       return res.status(400).json({ ok: false, mensaje: 'ID inválido' });
     }
 
-    const doc = await Tarjeta.findById(id).lean();
+    const doc = await Tarjeta.findById(id)
+      // NUEVO: incluimos el usuario (con nombre) en el detalle público
+      .populate({
+        path: 'usuario',
+        select: 'nombre _id',
+      })
+      .lean();
+
     // Por privacidad, respondemos 404 si no existe o no es pública
     if (!doc || doc.visibilidad !== 'publico') {
       return res.status(404).json({ ok: false, mensaje: 'No encontrada' });
@@ -356,10 +378,16 @@ export async function una(req, res) {
     const { id } = req.params;
     if (!isValidId(id)) return res.status(400).json({ ok: false, mensaje: 'ID inválido' });
 
-    const doc = await Tarjeta.findById(id);
+    const doc = await Tarjeta.findById(id)
+      // NUEVO: también traemos el usuario (nombre) en el detalle privado
+      .populate({
+        path: 'usuario',
+        select: 'nombre _id',
+      });
+
     if (!doc) return res.status(404).json({ ok: false, mensaje: 'No encontrada' });
 
-    const esMia = req.usuario && String(doc.usuario) === req.usuario.id;
+    const esMia = req.usuario && String(doc.usuario._id || doc.usuario) === req.usuario.id;
 
     if (!esMia) {
       // Pública → ok
@@ -368,7 +396,7 @@ export async function una(req, res) {
       }
       // Amigos → comprobar relación
       if (doc.visibilidad === 'amigos') {
-        const okAmigo = await sonAmigos(req.usuario.id, doc.usuario);
+        const okAmigo = await sonAmigos(req.usuario.id, doc.usuario._id || doc.usuario);
         if (!okAmigo) return res.status(403).json({ ok: false, mensaje: 'Sin permiso' });
       } else {
         // Privado y no es del usuario
@@ -482,7 +510,6 @@ export async function eliminar(req, res) {
 }
 
 // ---------- Subir 1 imagen (multipart/form-data, campo "file") ----------
-// ---------- Subir 1 imagen (multipart/form-data, campo "file") ----------
 // Versión PRO: optimiza la imagen con sharp (reduce peso y tamaño)
 export async function subirImagen(req, res) {
   try {
@@ -564,4 +591,3 @@ export async function subirImagen(req, res) {
     return res.status(500).json({ ok: false, mensaje: 'Error subiendo imagen', error: e.message });
   }
 }
-

@@ -1,8 +1,10 @@
 // src/servicios/comentarios.js
 // ————————————————————————————————————————————————
-// Cliente API para comentarios de tarjetas públicas.
+// Cliente API para comentarios de tarjetas.
 // Endpoints backend:
-//  - GET    /api/tarjetas/:id/comentarios        -> listar (público)
+//  - GET    /api/tarjetas/:id/comentarios        -> listar
+//       * Público para tarjetas públicas
+//       * Requiere token si la tarjeta es "amigos" o privada
 //  - POST   /api/tarjetas/:id/comentarios        -> crear (auth)
 //  - DELETE /api/comentarios/:id                 -> eliminar (auth)
 // ————————————————————————————————————————————————
@@ -37,20 +39,33 @@ const qs = (obj = {}) => {
 
 export const comentariosApi = {
   /**
-   * Listar comentarios de una tarjeta pública (paginado).
+   * Listar comentarios de una tarjeta (paginado).
+   * - Si hay token, se envía en Authorization (authFetch).
+   *   Esto permite que tarjetas con visibilidad "amigos" funcionen.
+   * - Si no hay token, el backend solo devolverá comentarios
+   *   en tarjetas totalmente públicas.
+   *
    * @param {string} tarjetaId
    * @param {{page?:number, limit?:number, parent?:string}} [params]
    * @param {{signal?:AbortSignal}} [opts]
    */
   async listar(tarjetaId, params = {}, opts = {}) {
-    const url = `${API_URL}/tarjetas/${encodeURIComponent(tarjetaId)}/comentarios${qs(params)}`;
-    const res = await fetch(url, { signal: opts.signal, cache: 'no-store' });
+    const url = `${API_URL}/tarjetas/${encodeURIComponent(
+      tarjetaId
+    )}/comentarios${qs(params)}`;
+
+    // ⬇️ USAMOS authFetch en lugar de fetch normal
+    const res = await authFetch(url, {
+      signal: opts.signal,
+      cache: 'no-store',
+    });
+
     return handle(res); // { ok, items, meta }
-    // Si la tarjeta no es pública, el backend responderá 403.
+    // Si la tarjeta no es accesible, el backend responderá 403.
   },
 
   /**
-   * Crear un comentario en una tarjeta pública (requiere token).
+   * Crear un comentario en una tarjeta (requiere token).
    * @param {string} tarjetaId
    * @param {{texto:string, parent?:string}} body
    * @param {{signal?:AbortSignal}} [opts]

@@ -15,12 +15,18 @@ import path from "path";
 import cookieParser from "cookie-parser"; // Cookies httpOnly (refresh)
 
 // Rutas
-import rutaSalud from "./rutas/salud.ruta.js";               // /api/salud
-import rutaAuth from "./rutas/auth.ruta.js";                 // /api/auth
-import rutaTarjetas from "./rutas/tarjetas.ruta.js";         // /api/tarjetas
-import rutaComentarios from "./rutas/comentarios.ruta.js";   // /api/...
-import adminTarjetasRouter from "./rutas/admin.tarjetas.ruta.js"; // /api/admin/*
-import amigosRouter from "./rutas/amigos.ruta.js";           // /api/amigos
+import rutaSalud from "./rutas/salud.ruta.js";                     // /api/salud
+import rutaAuth from "./rutas/auth.ruta.js";                       // /api/auth
+import rutaTarjetas from "./rutas/tarjetas.ruta.js";               // /api/tarjetas
+import rutaComentarios from "./rutas/comentarios.ruta.js";         // /api/...
+import adminTarjetasRouter from "./rutas/admin.tarjetas.ruta.js";  // /api/admin/tarjetas
+import amigosRouter from "./rutas/amigos.ruta.js";                 // /api/amigos
+
+// 👇 NUEVO: administración de usuarios
+import adminUsuariosRouter from "./rutas/admin.usuarios.ruta.js";  // /api/admin/usuarios
+
+// 👇 NUEVO: contacto / newsletter
+import rutaContacto from "./rutas/contacto.ruta.js";               // /api/contacto
 
 const app = express();
 
@@ -74,9 +80,11 @@ app.get("/", (_req, res) => {
 app.use("/api/salud", rutaSalud);
 app.use("/api/auth", rutaAuth);
 app.use("/api/tarjetas", rutaTarjetas);
-app.use("/api/amigos", amigosRouter);   // ⬅️ NUEVO: sistema de amigos
+app.use("/api/amigos", amigosRouter);          // sistema de amigos
 app.use("/api", rutaComentarios);
-app.use("/api", adminTarjetasRouter);
+app.use("/api", adminTarjetasRouter);          // admin de tarjetas
+app.use("/api", adminUsuariosRouter);          // admin de usuarios
+app.use("/api/contacto", rutaContacto);        // 👈 NUEVO: contacto/newsletter
 
 // Manejo de errores
 app.use((err, _req, res, _next) => {

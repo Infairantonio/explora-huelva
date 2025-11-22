@@ -1,17 +1,20 @@
 // src/servicios/adminTarjetas.js
-import { API_URL, getToken } from './api';
+// API de administración para TARJETAS (rutas /api/admin/tarjetas)
 
-const auth = () => {
+import { API_URL, getToken } from "./api";
+
+// Igual que en tarjetas.js
+const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
 async function handle(res) {
-  const ct = res.headers.get('content-type') || '';
-  const isJson = ct.includes('application/json');
+  const ct = res.headers.get("content-type") || "";
+  const isJson = ct.includes("application/json");
   const data = isJson ? await res.json().catch(() => ({})) : await res.text();
   if (!res.ok) {
-    const msg = (isJson && data?.mensaje) || res.statusText || 'Error de red';
+    const msg = (isJson && data?.mensaje) || res.statusText || "Error de red";
     const err = new Error(msg);
     err.status = res.status;
     err.payload = data;
@@ -23,64 +26,56 @@ async function handle(res) {
 const qs = (obj = {}) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || v === null || v === '') continue;
+    if (v === undefined || v === null || v === "") continue;
     p.set(k, v);
   }
   const s = p.toString();
-  return s ? `?${s}` : '';
+  return s ? `?${s}` : "";
 };
 
-export const adminTarjetas = {
-  // Listado de tarjetas con filtros (page, limit, q, etiqueta, visibilidad, eliminado, etc.)
-  async listar(params = {}) {
+export const adminTarjetasApi = {
+  // GET /api/admin/tarjetas
+  async listar(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas${qs(params)}`, {
-      headers: { ...auth() },
-      cache: 'no-store',
+      ...options,
+      headers: { ...authHeader(), ...(options.headers || {}) },
+      cache: "no-store",
     });
     return handle(r);
   },
 
-  // Detalle de una tarjeta (para moderación)
-  async detalle(id) {
+  // GET /api/admin/tarjetas/:id
+  async detalle(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
-      headers: { ...auth() },
-      cache: 'no-store',
+      ...options,
+      headers: { ...authHeader(), ...(options.headers || {}) },
+      cache: "no-store",
     });
     return handle(r);
   },
 
-  // Soft delete con motivo
-  async eliminar(id, motivo) {
+  // DELETE /api/admin/tarjetas/:id  (soft delete)
+  async eliminar(id, motivo = "", options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', ...auth() },
-      body: JSON.stringify({ motivo: motivo || '' }),
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader(),
+        ...(options.headers || {}),
+      },
+      body: JSON.stringify({ motivo }),
+      ...options,
     });
     return handle(r);
   },
 
-  // Restaurar una tarjeta previamente eliminada
-  async restaurar(id) {
+  // POST /api/admin/tarjetas/:id/restaurar
+  async restaurar(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}/restaurar`, {
-      method: 'POST',
-      headers: { ...auth() },
+      method: "POST",
+      headers: { ...authHeader(), ...(options.headers || {}) },
+      ...options,
     });
     return handle(r);
   },
 };
-
-// Comprobación rápida: ¿el token actual tiene acceso a /admin?
-export async function soyAdmin() {
-  const t = getToken();
-  if (!t) return false;
-  try {
-    // El backend acepta page/limit (y también pageSize por compat)
-    const r = await fetch(`${API_URL}/admin/tarjetas?page=1&limit=1`, {
-      headers: { ...auth() },
-      cache: 'no-store',
-    });
-    return r.status === 200;
-  } catch {
-    return false;
-  }
-}

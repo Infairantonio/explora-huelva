@@ -1,5 +1,4 @@
-﻿// src/main.jsx
-// ---------------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------------
 // Punto de entrada del frontend (Vite).
 // ---------------------------------------------------------------------------------
 
@@ -22,6 +21,10 @@ import RutaPrivada from "./componentes/RutaProtegida.jsx";
 import TarjetaPublica from "./paginas/TarjetaPublica.jsx";
 import Lugares from "./paginas/Lugares.jsx";
 import AdminTarjetas from "./paginas/AdminTarjetas.jsx";
+import Contacto from "./paginas/Contacto.jsx";
+
+// 🔹 Admin usuarios
+import AdminUsuarios from "./paginas/AdminUsuarios.jsx";
 
 // 🔹 Autenticación avanzada
 import Verifica from "./paginas/Verifica.jsx";
@@ -31,11 +34,21 @@ import Reset from "./paginas/Reset.jsx";
 // 🔹 Amigos
 import Amigos from "./paginas/Amigos.jsx";
 
-// 🔹 NUEVO: Blog (estático)
+// 🔹 Blog (estático)
 import Blog from "./paginas/Blog.jsx";
 
-// 🔹 (Si aún no lo tenías) Sobre nosotros
+// 🔹 Sobre nosotros
 import SobreNosotros from "./paginas/SobreNosotros.jsx";
+
+// 🔹 Ayuda
+import Ayuda from "./paginas/Ayuda.jsx";
+
+// 🔹 Legal
+import Privacidad from "./paginas/Privacidad.jsx";
+import Terminos from "./paginas/Terminos.jsx";
+
+// 🔹 NUEVO: Mapa interactivo
+import Mapa from "./paginas/Mapa.jsx";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -43,6 +56,7 @@ createRoot(document.getElementById("root")).render(
       <Routes>
         {/* Layout principal (navbar + footer + <Outlet/>) */}
         <Route path="/" element={<App />}>
+
           {/* Públicas */}
           <Route index element={<Inicio />} />
           <Route path="login" element={<Login />} />
@@ -50,6 +64,12 @@ createRoot(document.getElementById("root")).render(
           <Route path="tarjetas/:id" element={<TarjetaPublica />} />
           <Route path="sobre" element={<SobreNosotros />} />
           <Route path="blog" element={<Blog />} />
+          <Route path="ayuda" element={<Ayuda />} />
+          <Route path="privacidad" element={<Privacidad />} />
+          <Route path="terminos" element={<Terminos />} />
+
+          {/* Nuevo: Mapa público */}
+          <Route path="mapa" element={<Mapa />} />
 
           {/* Auth avanzada */}
           <Route path="verifica" element={<Verifica />} />
@@ -71,6 +91,7 @@ createRoot(document.getElementById("root")).render(
               </RutaPrivada>
             }
           />
+
           <Route
             path="panel/amigos"
             element={
@@ -79,6 +100,7 @@ createRoot(document.getElementById("root")).render(
               </RutaPrivada>
             }
           />
+
           <Route
             path="panel/nuevo"
             element={
@@ -87,6 +109,7 @@ createRoot(document.getElementById("root")).render(
               </RutaPrivada>
             }
           />
+
           <Route
             path="panel/editar/:id"
             element={
@@ -105,6 +128,16 @@ createRoot(document.getElementById("root")).render(
               </RutaPrivada>
             }
           />
+          <Route
+            path="admin/usuarios"
+            element={
+              <RutaPrivada>
+                <AdminUsuarios />
+              </RutaPrivada>
+            }
+          />
+
+          <Route path="contacto" element={<Contacto />} />
 
           {/* Fallback */}
           <Route path="*" element={<Inicio />} />

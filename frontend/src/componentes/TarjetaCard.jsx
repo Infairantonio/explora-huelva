@@ -1,3 +1,4 @@
+// src/componentes/TarletaCard.jsx
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -89,7 +90,6 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
   const esMp4 = typeof videoUrl === 'string' && videoUrl.toLowerCase().endsWith('.mp4');
 
   const vis = (item?.visibilidad || '').toLowerCase();
-  const esPublica = vis === 'publico';
   const visTexto =
     vis === 'publico' ? 'Público' :
     vis === 'privado' ? 'Privado' :
@@ -102,14 +102,28 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
   // URL de "Cómo llegar" si hay coordenadas válidas
   const mapsUrl = buildMapsUrl(item?.lat, item?.lng);
 
+  // Nombre del creador (si el backend ha hecho populate de usuario)
+  const creadorNombre = item?.usuario?.nombre || null;
+
+  // Descripción corta para la tarjeta (mejora legibilidad)
+  const descripcionTexto = item?.descripcion || 'Sin descripción.';
+  const descripcionCorta =
+    descripcionTexto.length > 180
+      ? `${descripcionTexto.slice(0, 177)}…`
+      : descripcionTexto;
+
   return (
-    <div className="card h-100 shadow-sm">
+    <article
+      className="card h-100 border-0 shadow-sm"
+      style={{ borderRadius: '1rem', overflow: 'hidden' }}
+      aria-label={item?.titulo || 'Tarjeta de contenido'}
+    >
       {/* MEDIA: 1) iframe 2) video mp4 3) imagen */}
       {embed ? (
         <div className="ratio ratio-16x9">
           <iframe
             src={embed}
-            title={item?.titulo || 'video'}
+            title={item?.titulo || 'Video de la tarjeta'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             loading="lazy"
@@ -118,44 +132,78 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
           />
         </div>
       ) : esMp4 ? (
-        <video
-          className="w-100"
-          style={{ maxHeight: 220, objectFit: 'cover' }}
-          controls
-          preload="metadata"
-          src={videoUrl || undefined}
-        />
+        <div className="position-relative">
+          <video
+            className="w-100"
+            style={{ maxHeight: 220, objectFit: 'cover' }}
+            controls
+            preload="metadata"
+            src={videoUrl || undefined}
+          />
+        </div>
       ) : portada ? (
-        <img
-          src={portada}
-          className="card-img-top"
-          alt={item?.titulo || 'portada'}
-          style={{ objectFit: 'cover', height: 180 }}
-          loading="lazy"
-          decoding="async"
-          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-        />
+        <div className="position-relative">
+          <img
+            src={portada}
+            className="card-img-top"
+            alt={item?.titulo || 'Imagen de la tarjeta'}
+            style={{ objectFit: 'cover', height: 200 }}
+            loading="lazy"
+            decoding="async"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+          <div
+            className="position-absolute top-0 start-0 w-100"
+            style={{
+              height: '40%',
+              backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,.35), transparent)',
+            }}
+            aria-hidden="true"
+          />
+        </div>
       ) : null}
 
       {/* CUERPO */}
       <div className="card-body">
-        <div className="d-flex align-items-center justify-content-between">
-          <h5 className="card-title mb-1">{item?.titulo || 'Sin título'}</h5>
-          <span className={`badge ${visClass}`}>{visTexto}</span>
+        {/* Cabecera: título + estado de visibilidad */}
+        <div className="d-flex align-items-start justify-content-between mb-1">
+          <div className="me-2">
+            <h2 className="card-title h5 mb-1">
+              {item?.titulo || 'Sin título'}
+            </h2>
+
+            {/* Creador */}
+            {creadorNombre && (
+              <p className="mb-0 small text-muted">
+                por <span className="fw-semibold">{creadorNombre}</span>
+              </p>
+            )}
+          </div>
+
+          <span
+            className={`badge align-self-start ${visClass}`}
+            aria-label={`Visibilidad: ${visTexto}`}
+          >
+            {visTexto}
+          </span>
         </div>
 
-        <p className="card-text mt-2 small text-muted">
-          {item?.descripcion || 'Sin descripción.'}
+        {/* Descripción corta con saltos de línea respetados */}
+        <p className="card-text small text-muted mt-2 descripcion-tarjeta">
+          {descripcionCorta}
         </p>
 
         {/* Etiquetas */}
         {Array.isArray(item?.etiquetas) && item.etiquetas.length > 0 && (
-          <div className="small mt-2">
+          <div className="small mt-2" aria-label="Etiquetas de la tarjeta">
             {item.etiquetas.map((t, idx) => {
               const txt = String(t || '').trim();
               if (!txt) return null;
               return (
-                <span key={`${txt}-${idx}`} className={`badge me-1 ${etiquetaBadgeClass(txt)}`}>
+                <span
+                  key={`${txt}-${idx}`}
+                  className={`badge me-1 mb-1 ${etiquetaBadgeClass(txt)}`}
+                >
                   {txt}
                 </span>
               );
@@ -165,15 +213,15 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
 
         {/* Mini-galería */}
         {imagenes.length > 1 && (
-          <div className="d-flex gap-2 mt-3 flex-wrap">
+          <div className="d-flex gap-2 mt-3 flex-wrap" aria-label="Imágenes adicionales">
             {imagenes.slice(1, 5).map((src, i) => {
               if (!src) return null;
               return (
                 <img
                   key={`${src}-${i}`}
                   src={src}
-                  alt={`${item?.titulo || 'imagen'} ${i + 2}`}
-                  style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }}
+                  alt={`${item?.titulo || 'Imagen'} ${i + 2}`}
+                  style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }}
                   loading="lazy"
                   decoding="async"
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -190,54 +238,74 @@ function TarjetaCard({ item, onEdit, onDelete, detalleHref, abrirEnNuevaPestana 
       </div>
 
       {/* FOOTER acciones */}
-      {(mapsUrl || onEdit || onDelete || (esPublica && detalleHref)) && (
-        <div className="card-footer bg-white border-0 d-flex gap-2 flex-wrap">
-          {mapsUrl && (
-            <a
-              className="btn btn-sm btn-outline-success"
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Cómo llegar"
-            >
-              <i className="bi bi-geo-alt me-1" /> Cómo llegar
-            </a>
-          )}
-
-          {/* Ver detalle
-              Nota: por ahora mantenemos el botón solo para 'publico'.
-              Cuando el backend permita detalle a amigos, podemos habilitarlo para 'amigos'. */}
-          {esPublica && detalleHref && (
-            abrirEnNuevaPestana ? (
+      {(mapsUrl || onEdit || onDelete || detalleHref) && (
+        <div className="card-footer bg-white border-0 pt-0 pb-3 px-3">
+          <div className="d-flex flex-wrap gap-2">
+            {mapsUrl && (
               <a
-                className="btn btn-sm btn-outline-secondary"
-                href={detalleHref}
+                className="btn btn-sm btn-outline-success"
+                href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Ver detalle"
+                title="Abrir ruta en Google Maps"
+                aria-label={`Cómo llegar a ${item?.titulo || 'este lugar'}`}
               >
-                <i className="bi bi-box-arrow-up-right me-1" /> Ver detalle
+                <i className="bi bi-geo-alt me-1" /> Cómo llegar
               </a>
-            ) : (
-              <Link className="btn btn-sm btn-outline-secondary" to={detalleHref}>
-                <i className="bi bi-box-arrow-up-right me-1" /> Ver detalle
-              </Link>
-            )
-          )}
+            )}
 
-          {onEdit && (
-            <button className="btn btn-sm btn-outline-primary" onClick={onEdit}>
-              <i className="bi bi-pencil me-1" /> Editar
-            </button>
-          )}
-          {onDelete && (
-            <button className="btn btn-sm btn-outline-danger" onClick={onDelete}>
-              <i className="bi bi-trash me-1" /> Eliminar
-            </button>
-          )}
+            {/* 👇 Ahora: si hay detalleHref, SIEMPRE mostramos "Ver detalle" */}
+            {detalleHref && (
+              abrirEnNuevaPestana ? (
+                <a
+                  className="btn btn-sm btn-outline-secondary"
+                  href={detalleHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Ver detalle de la tarjeta"
+                  aria-label={`Ver detalle de ${item?.titulo || 'esta tarjeta'} en una nueva pestaña`}
+                >
+                  <i className="bi bi-box-arrow-up-right me-1" /> Ver detalle
+                </a>
+              ) : (
+                <Link
+                  className="btn btn-sm btn-outline-secondary"
+                  to={detalleHref}
+                  title="Ver detalle de la tarjeta"
+                  aria-label={`Ver detalle de ${item?.titulo || 'esta tarjeta'}`}
+                >
+                  <i className="bi bi-box-arrow-up-right me-1" /> Ver detalle
+                </Link>
+              )
+            )}
+
+            {onEdit && (
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={onEdit}
+                type="button"
+                title="Editar tarjeta"
+                aria-label={`Editar tarjeta ${item?.titulo || ''}`}
+              >
+                <i className="bi bi-pencil me-1" /> Editar
+              </button>
+            )}
+
+            {onDelete && (
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={onDelete}
+                type="button"
+                title="Eliminar tarjeta"
+                aria-label={`Eliminar tarjeta ${item?.titulo || ''}`}
+              >
+                <i className="bi bi-trash me-1" /> Eliminar
+              </button>
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -253,7 +321,11 @@ TarjetaCard.propTypes = {
     videoUrl: PropTypes.string,
     lat: PropTypes.number,           // opcional
     lng: PropTypes.number,           // opcional
-    eliminado: PropTypes.bool,       // ⬅️ nuevo (soft delete)
+    eliminado: PropTypes.bool,       // soft delete
+    usuario: PropTypes.shape({
+      _id: PropTypes.string,
+      nombre: PropTypes.string,
+    }),
   }).isRequired,
   onEdit: PropTypes.func,
   onDelete: PropTypes.func,
