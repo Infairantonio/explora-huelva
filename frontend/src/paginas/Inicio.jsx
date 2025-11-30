@@ -48,7 +48,7 @@ export default function Inicio() {
     : { texto: 'Iniciar sesión', href: '/login' };
 
   useEffect(() => {
-    // Salud del backend
+    // Salud del backend (sigue funcionando pero NO se muestra)
     fetch(`${API_URL}/salud`)
       .then((r) => r.json())
       .then(setSalud)
@@ -153,7 +153,15 @@ export default function Inicio() {
         )}
       </div>
 
-      {/* PANEL DE ESTADO (puede ocultarse en el futuro si lo deseas) */}
+      {/*
+      ======================================================================================
+      PANEL DE ESTADO (OCULTO)
+      ======================================================================================
+      - Seguimos manteniendo el código por si necesitas depurar en el futuro.
+      - Está completamente comentado para que NO se muestre al usuario.
+      - Puedes volver a activarlo fácilmente quitando los comentarios.
+      ======================================================================================
+
       <div className="container mb-5">
         <h3 className="mb-3 text-primary fw-bold">Panel de Estado</h3>
         <div
@@ -178,6 +186,9 @@ export default function Inicio() {
           </div>
         </div>
       </div>
+
+      ======================================================================================
+      */}
     </>
   );
 }
