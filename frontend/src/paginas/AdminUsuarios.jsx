@@ -1,16 +1,9 @@
 // src/paginas/AdminUsuarios.jsx
-// Panel de administración de USUARIOS:
-// - Listar y filtrar usuarios
-// - Cambiar rol
-// - Bloquear / desbloquear
-// - Eliminar (soft) y restaurar
+// Panel de administración de usuarios: listado, filtros, roles, bloqueo y eliminación.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-// 👇 IMPORT CORRECTO, igual que hicimos con tarjetas
 import { adminUsuariosApi as adminUsuarios } from "../servicios/adminUsuarios";
-
 import { logout } from "../utils/auth";
 
 export default function AdminUsuarios() {
@@ -23,7 +16,7 @@ export default function AdminUsuarios() {
     total: 0,
   });
 
-  // Filtros / parámetros
+  // Filtros y parámetros de consulta
   const [f, setF] = useState({
     q: "",
     rol: "",
@@ -42,7 +35,6 @@ export default function AdminUsuarios() {
     aborter.current = ctrl;
 
     try {
-      // 👇 pasamos filtros y opciones (signal) como 2º argumento
       const r = await adminUsuarios.listar(params, { signal: ctrl.signal });
 
       setEstado({
@@ -105,7 +97,7 @@ export default function AdminUsuarios() {
     cargar(p);
   };
 
-  // Acciones
+  // Acciones sobre un usuario
 
   const cambiarRol = async (id, rol) => {
     if (!window.confirm(`¿Cambiar rol de este usuario a "${rol}"?`)) return;
@@ -159,8 +151,7 @@ export default function AdminUsuarios() {
     }
   };
 
-  // Helpers UI
-
+  // Resumen de usuarios por estado
   const resumen = useMemo(() => {
     const arr = estado.items || [];
     let activos = 0;
@@ -339,8 +330,8 @@ export default function AdminUsuarios() {
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="table-responsive">
+      {/* ===== ESCRITORIO / TABLET: TABLA ===== */}
+      <div className="table-responsive d-none d-md-block">
         <table className="table table-hover align-middle">
           <thead>
             <tr>
@@ -415,18 +406,14 @@ export default function AdminUsuarios() {
                             {u.bloqueado ? (
                               <button
                                 className="btn btn-sm btn-outline-success"
-                                onClick={() =>
-                                  desbloquear(u._id || u.id)
-                                }
+                                onClick={() => desbloquear(u._id || u.id)}
                               >
                                 <i className="bi bi-unlock" /> Desbloquear
                               </button>
                             ) : (
                               <button
                                 className="btn btn-sm btn-outline-warning"
-                                onClick={() =>
-                                  bloquear(u._id || u.id)
-                                }
+                                onClick={() => bloquear(u._id || u.id)}
                               >
                                 <i className="bi bi-lock" /> Bloquear
                               </button>
@@ -458,6 +445,117 @@ export default function AdminUsuarios() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* ===== MÓVIL: TARJETAS ===== */}
+      <div className="d-md-none">
+        {estado.cargando ? (
+          <div className="text-center text-muted my-3">Cargando…</div>
+        ) : (estado.items || []).length === 0 ? (
+          <div className="text-muted my-3">Sin resultados</div>
+        ) : (
+          <div className="d-flex flex-column gap-2">
+            {(estado.items || []).map((u) => {
+              const rolActual = u.rol || "usuario";
+              const ultimoAcceso = u.lastLoginAt || u.ultimoAcceso;
+
+              return (
+                <div
+                  key={u._id || u.id}
+                  className={`card shadow-sm ${
+                    u.eliminado ? "border-warning" : "border-0"
+                  }`}
+                >
+                  <div className="card-body">
+                    <div className="d-flex justify-content-between align-items-start mb-1">
+                      <h2 className="h6 mb-0">
+                        {u.nombre || "(sin nombre)"}
+                      </h2>
+                      <span className={estadoBadgeClass(u)}>
+                        {estadoLabel(u)}
+                      </span>
+                    </div>
+
+                    <div className="text-muted small mb-2">
+                      {u.email || "—"}
+                    </div>
+
+                    <div className="mb-2">
+                      <label className="form-label form-label-sm mb-1">
+                        Rol
+                      </label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={rolActual}
+                        onChange={(e) =>
+                          cambiarRol(u._id || u.id, e.target.value)
+                        }
+                      >
+                        {rolesDisponibles.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="small text-muted mb-1">
+                      Creado:{" "}
+                      {u.createdAt
+                        ? new Date(u.createdAt).toLocaleString()
+                        : "—"}
+                    </div>
+                    <div className="small text-muted mb-2">
+                      Último acceso:{" "}
+                      {ultimoAcceso
+                        ? new Date(ultimoAcceso).toLocaleString()
+                        : "—"}
+                    </div>
+
+                    <div className="d-flex flex-wrap gap-2 mt-2">
+                      {!u.eliminado && (
+                        <>
+                          {u.bloqueado ? (
+                            <button
+                              className="btn btn-sm btn-outline-success flex-fill"
+                              onClick={() => desbloquear(u._id || u.id)}
+                            >
+                              <i className="bi bi-unlock" /> Desbloquear
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-outline-warning flex-fill"
+                              onClick={() => bloquear(u._id || u.id)}
+                            >
+                              <i className="bi bi-lock" /> Bloquear
+                            </button>
+                          )}
+
+                          <button
+                            className="btn btn-sm btn-outline-danger flex-fill"
+                            onClick={() => eliminar(u._id || u.id)}
+                          >
+                            <i className="bi bi-trash" /> Eliminar
+                          </button>
+                        </>
+                      )}
+
+                      {u.eliminado && (
+                        <button
+                          className="btn btn-sm btn-outline-secondary flex-fill"
+                          onClick={() => restaurar(u._id || u.id)}
+                        >
+                          <i className="bi bi-arrow-counterclockwise" />{" "}
+                          Restaurar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Paginación */}

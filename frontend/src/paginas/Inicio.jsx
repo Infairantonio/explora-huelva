@@ -1,9 +1,12 @@
 // src/paginas/Inicio.jsx
-// Portada pública:
-// - Hero de portada
-// - Listado combinado: públicas + amigos
-// - Cada tarjeta tiene siempre Ver detalle (backend decide si puedes entrar)
-// - Panel de estado (debug)
+// Página principal pública de Explora Huelva.
+// Muestra el hero y un listado combinado:
+// - Tarjetas públicas
+// - Tarjetas de amigos (si hay sesión)
+// El backend controla el acceso al detalle.
+
+// Carga salud del backend (diagnóstico simple).
+// Mantiene los comentarios esenciales sin tecnicismos.
 
 import { useEffect, useState } from 'react';
 import Hero from '../componentes/Hero';
@@ -17,14 +20,14 @@ export default function Inicio() {
   const [salud, setSalud] = useState(null);
   const [errorSalud, setErrorSalud] = useState('');
 
-  // Estado para tarjetas públicas
+  // Tarjetas públicas
   const [pub, setPub] = useState({
     cargando: true,
     error: '',
     items: [],
   });
 
-  // Estado para tarjetas de amigos
+  // Tarjetas de amigos
   const [amg, setAmg] = useState({
     cargando: false,
     error: '',
@@ -32,10 +35,9 @@ export default function Inicio() {
     intentado: false,
   });
 
-  // 👉 Saber si hay sesión (para el botón del Hero)
+  // Saber si hay sesión para decidir botones del hero
   const token = getToken();
 
-  // Props del Hero según estado de sesión
   const botonPrincipalHero = {
     texto: 'Ver rutas',
     href: '/explorar/rutas',
@@ -46,33 +48,38 @@ export default function Inicio() {
     : { texto: 'Iniciar sesión', href: '/login' };
 
   useEffect(() => {
-    // 1) Salud
+    // Salud del backend
     fetch(`${API_URL}/salud`)
       .then((r) => r.json())
       .then(setSalud)
       .catch((err) => setErrorSalud(err.message));
 
-    // 2) Cargar públicas
-    tarjetasApi.publicas()
+    // Tarjetas públicas
+    tarjetasApi
+      .publicas()
       .then((r) => {
-        if (!r.ok) throw new Error(r.mensaje || 'No se pudieron cargar las tarjetas públicas');
+        if (!r.ok)
+          throw new Error(r.mensaje || 'No se pudieron cargar las tarjetas públicas');
         setPub({ cargando: false, error: '', items: r.items || [] });
       })
       .catch((e) => {
         setPub({ cargando: false, error: e.message, items: [] });
       });
 
-    // 3) Cargar amigos si hay token
+    // Tarjetas de amigos (solo si hay token)
     const t = getToken();
     if (t) {
       setAmg((s) => ({ ...s, cargando: true, intentado: true }));
-      tarjetasApi.amigos()
+      tarjetasApi
+        .amigos()
         .then((r) => {
-          if (!r.ok) throw new Error(r.mensaje || 'No se pudieron cargar tarjetas de amigos');
+          if (!r.ok)
+            throw new Error(r.mensaje || 'No se pudieron cargar tarjetas de amigos');
           setAmg({ cargando: false, error: '', items: r.items || [], intentado: true });
         })
         .catch((e) => {
-          const msg = e?.status === 401 ? '' : (e.message || 'Error al cargar tarjetas de amigos');
+          const msg =
+            e?.status === 401 ? '' : e.message || 'Error al cargar tarjetas de amigos';
           setAmg({ cargando: false, error: msg, items: [], intentado: true });
         });
     } else {
@@ -80,19 +87,18 @@ export default function Inicio() {
     }
   }, []);
 
-  // Filtrar eliminadas por seguridad
+  // Filtrado de seguridad
   const pubVisibles = (pub.items || []).filter((t) => !t?.eliminado);
   const amgVisibles = (amg.items || []).filter((t) => !t?.eliminado);
 
-  // COMBINADO: públicas + amigos
+  // Combinado final
   const todas = [...pubVisibles, ...amgVisibles];
 
-  const cargandoGlobal =
-    pub.cargando || (amg.intentado && amg.cargando);
+  const cargandoGlobal = pub.cargando || (amg.intentado && amg.cargando);
 
   return (
     <>
-      {/* HERO */}
+      {/* HERO principal */}
       <Hero
         titulo="Explora Huelva"
         subtitulo="Descubre rutas, lugares y experiencias únicas"
@@ -108,8 +114,8 @@ export default function Inicio() {
         </div>
 
         <p className="text-muted small mb-3">
-          Públicas: <strong>{pubVisibles.length}</strong> ·
-          Amigos: <strong>{amgVisibles.length}</strong>
+          Públicas: <strong>{pubVisibles.length}</strong> · Amigos:{' '}
+          <strong>{amgVisibles.length}</strong>
         </p>
 
         {pub.error && (
@@ -138,24 +144,26 @@ export default function Inicio() {
           <div className="row g-3">
             {todas.map((it) => (
               <div key={it._id} className="col-12 col-sm-6 col-lg-4">
-                {/* 👇 SIEMPRE mostrar Ver detalle,
-                    el backend decidirá si tiene permiso */}
-                <TarjetaCard
-                  item={it}
-                  detalleHref={`/tarjetas/${it._id}`}
-                />
+                {/* Siempre mostrar el enlace de detalle.
+                   El backend decide si el usuario puede verlo. */}
+                <TarjetaCard item={it} detalleHref={`/tarjetas/${it._id}`} />
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* PANEL DE ESTADO */}
+      {/* PANEL DE ESTADO (puede ocultarse en el futuro si lo deseas) */}
       <div className="container mb-5">
         <h3 className="mb-3 text-primary fw-bold">Panel de Estado</h3>
-        <div className="card shadow-sm border-0" style={{ backgroundColor: 'var(--azul-claro)' }}>
+        <div
+          className="card shadow-sm border-0"
+          style={{ backgroundColor: 'var(--azul-claro)' }}
+        >
           <div className="card-body">
-            <p><strong>API_URL efectiva:</strong> {API_URL}</p>
+            <p>
+              <strong>API_URL efectiva:</strong> {API_URL}
+            </p>
 
             {errorSalud && <div className="alert alert-danger">Error: {errorSalud}</div>}
 

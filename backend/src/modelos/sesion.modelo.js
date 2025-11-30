@@ -1,35 +1,55 @@
 // backend/src/modelos/sesion.modelo.js
 // ————————————————————————————————————————————————
 // Modelo de sesión para refresh tokens httpOnly.
-// Guardamos solo el HASH del refresh (nunca el token en claro).
-// Campos útiles para auditoría: IP y user-agent.
+// Guardamos solo el HASH del refresh token (nunca el token en claro).
+// Incluye información de auditoría (IP, user-agent),
+// revocación y caducidad.
 // ————————————————————————————————————————————————
 
 import mongoose from 'mongoose';
-
 const { Schema } = mongoose;
 
 const SesionSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'Usuario', index: true, required: true },
+    // Usuario propietario de la sesión
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Usuario',
+      required: true,
+      index: true,
+    },
 
     // Hash SHA-256 del refresh token (único)
-    tokenHash: { type: String, unique: true, index: true, required: true },
+    tokenHash: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
 
     // Auditoría
     ip: { type: String, default: '' },
     userAgent: { type: String, default: '' },
 
     // Revocación y caducidad
-    revoked: { type: Boolean, default: false, index: true },
-    expiresAt: { type: Date, required: true, index: true },
+    revoked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+      index: true,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true, // createdAt + updatedAt
+  }
 );
 
-// TTL opcional (si quieres que Mongo borre automáticamente tras caducar):
-// OJO: para TTL hay que usar { expireAfterSeconds: 0 } y una fecha en expiresAt.
+// ——— TTL opcional si algún día quieres limpieza automática ———
 // SesionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.models.Sesion || mongoose.model('Sesion', SesionSchema);
-
+export default mongoose.models.Sesion ||
+  mongoose.model('Sesion', SesionSchema);

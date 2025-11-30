@@ -1,15 +1,10 @@
 // backend/src/controladores/comentarios.controlador.js
 // ————————————————————————————————————————————————————————
-// Comentarios en tarjetas (públicas, de amigos o privadas).
-// Endpoints previstos (ver rutas):
-//  - GET    /api/tarjetas/:id/comentarios
-//      -> listar
-//         * Público para tarjetas "publico"
-//         * Requiere usuario con acceso para "amigos" o "privado"
-//  - POST   /api/tarjetas/:id/comentarios
-//      -> crear (auth, requiere usuario con acceso)
-//  - DELETE /api/comentarios/:id
-//      -> eliminar (auth: autor o dueño de la tarjeta)
+// Controlador de comentarios en tarjetas
+//   - Listar comentarios (según visibilidad)
+//   - Crear comentarios y respuestas (auth)
+//   - Eliminar comentario (autor o dueño de la tarjeta)
+// Visibilidad: público / amigos / privado.
 // ————————————————————————————————————————————————————————
 
 import mongoose from 'mongoose';
@@ -17,7 +12,7 @@ import Comentario from '../modelos/comentario.modelo.js';
 import Tarjeta from '../modelos/tarjeta.modelo.js';
 import Amigo from '../modelos/amigo.modelo.js';
 
-// ——— helpers básicos ———
+// Helpers básicos
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 const parsePage = (v, def = 1) =>
   Math.max(parseInt(String(v || def), 10) || def, 1);
@@ -26,10 +21,11 @@ const parseLimit = (v, def = 20, min = 1, max = 100) => {
   return Math.min(Math.max(n, min), max);
 };
 
-// ——— helper amistad (igual filosofía que en tarjetas.controlador) ———
+// Comprueba si dos usuarios son amigos (misma lógica que en tarjetas.controlador)
 async function sonAmigos(userIdA, userIdB) {
   if (!userIdA || !userIdB) return false;
   if (String(userIdA) === String(userIdB)) return true; // propietario
+
   const rel = await Amigo.findOne({
     estado: 'aceptada',
     $or: [
@@ -39,16 +35,17 @@ async function sonAmigos(userIdA, userIdB) {
   })
     .select({ _id: 1 })
     .lean();
+
   return !!rel;
 }
 
 /**
- * Carga la tarjeta y comprueba SI EL USUARIO PUEDE VER/COMENTAR:
+ * Carga la tarjeta y comprueba si el usuario puede ver/comentar.
  *
  * Reglas:
  *  - visibilidad = 'publico':
  *      -> cualquiera puede listar comentarios
- *      -> para crear, necesitarás auth en la ruta POST (req.usuario.id)
+ *      -> para crear, la ruta POST exige usuario autenticado
  *
  *  - visibilidad = 'amigos':
  *      -> solo dueño o amigos pueden listar/crear
@@ -56,7 +53,7 @@ async function sonAmigos(userIdA, userIdB) {
  *  - visibilidad = 'privado':
  *      -> solo dueño puede listar/crear
  *
- * Devuelve { tarjeta } o null tras responder con el error adecuado.
+ * Devuelve { tarjeta } o null (si hay error ya responde al cliente).
  */
 async function cargarTarjetaParaComentarios(req, res, tarjetaId) {
   if (!isValidId(tarjetaId)) {
@@ -77,13 +74,12 @@ async function cargarTarjetaParaComentarios(req, res, tarjetaId) {
   const vis = tarjeta.visibilidad;
   const uid = req.usuario?.id || null; // puede venir vacío si la ruta es pública
 
-  // 1) Pública: cualquiera puede ver comentarios.
-  //    (Crear comentario requerirá auth en POST igualmente).
+  // Pública: cualquiera puede ver comentarios.
   if (vis === 'publico') {
     return { tarjeta };
   }
 
-  // A partir de aquí, para "amigos" o "privado" NECESITAMOS usuario
+  // Para "amigos" o "privado" se requiere usuario autenticado
   if (!uid) {
     res.status(403).json({
       ok: false,
@@ -95,12 +91,12 @@ async function cargarTarjetaParaComentarios(req, res, tarjetaId) {
 
   const esDueno = String(tarjeta.usuario) === uid;
 
-  // 2) Si soy el dueño, siempre tengo acceso a comentarios
+  // Dueño: acceso completo
   if (esDueno) {
     return { tarjeta };
   }
 
-  // 3) Tarjeta de amigos: debe existir relación de amistad
+  // Tarjeta de amigos: debe existir relación de amistad
   if (vis === 'amigos') {
     const okAmigo = await sonAmigos(uid, tarjeta.usuario);
     if (!okAmigo) {
@@ -112,7 +108,7 @@ async function cargarTarjetaParaComentarios(req, res, tarjetaId) {
     return { tarjeta };
   }
 
-  // 4) Tarjeta privada y NO soy el dueño
+  // Tarjeta privada y no es el dueño
   res.status(403).json({
     ok: false,
     mensaje: 'Comentarios no disponibles en esta tarjeta',

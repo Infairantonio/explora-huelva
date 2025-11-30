@@ -1,4 +1,6 @@
 // src/paginas/Reset.jsx
+// Pantalla para restablecer la contraseña a partir del token recibido por email.
+
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { resetPassword } from "../servicios/api";
@@ -22,15 +24,15 @@ export default function Reset() {
       <div className="container py-4">
         <h1 className="mb-3">Restablecer contraseña</h1>
         <div className="alert alert-danger">Falta el token en la URL.</div>
-        <Link to="/login" className="btn btn-primary">Ir al login</Link>
+        <Link to="/login" className="btn btn-primary">
+          Ir al login
+        </Link>
       </div>
     );
   }
 
   const puedeEnviar =
-    !loading &&
-    password1.length >= 6 &&
-    password1 === password2;
+    !loading && password1.length >= 6 && password1 === password2;
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -39,7 +41,7 @@ export default function Reset() {
     setLoading(true);
     setMsg("");
     try {
-      // 👉 el backend espera { token, newPassword }
+      // El backend espera un objeto con { token, newPassword }
       const data = await resetPassword({ token, newPassword: password1 });
       if (data?.ok) {
         navigate("/login?reset=ok", { replace: true });
@@ -49,7 +51,8 @@ export default function Reset() {
     } catch (err) {
       const detalle =
         err?.payload?.mensaje ||
-        (Array.isArray(err?.payload?.errores) && err.payload.errores[0]?.msg) ||
+        (Array.isArray(err?.payload?.errores) &&
+          err.payload.errores[0]?.msg) ||
         err?.message ||
         "Error al restablecer";
       setMsg("❌ " + detalle);
@@ -90,7 +93,9 @@ export default function Reset() {
         </div>
 
         {password1 && password2 && password1 !== password2 && (
-          <div className="text-danger mb-2">Las contraseñas no coinciden.</div>
+          <div className="text-danger mb-2">
+            Las contraseñas no coinciden.
+          </div>
         )}
 
         <button className="btn btn-primary" disabled={!puedeEnviar}>

@@ -1,23 +1,26 @@
 // backend/src/modelos/tarjeta.modelo.js
 // ——————————————————————————————————————————————————————————
-// Esquema Mongoose para "Tarjeta" (lugares/experiencias/rutas).
-// Reglas de validación: título, descripción, visibilidad, ≥1 etiqueta y ≥1 imagen.
-// Vídeo opcional. Campo legado imagenUrl mantenido por compatibilidad.
-// Ubicación opcional (lat/lng) con validación de pareja.
-// Incluye campos de moderación (soft delete) para panel admin.
+// Esquema Mongoose para "Tarjeta" (lugares / experiencias / rutas).
+// Validaciones completas:
+//  - Título y descripción obligatorios
+//  - ≥1 imagen (o imagenUrl legado) y máx. 10
+//  - Etiquetas válidas y mín. 1
+//  - Visibilidad: público, privado o amigos
+//  - Ubicación opcional (lat/lng deben venir juntos)
+// Soft delete para panel admin.
 // ——————————————————————————————————————————————————————————
 
 import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
-// Lista única de etiquetas válidas (fuente de verdad)
+// Fuente única de verdad sobre etiquetas válidas
 export const ETIQUETAS_PERMITIDAS = ['lugares', 'experiencias', 'rutas'];
 
-// NUEVO: lista de visibilidades permitidas, añadimos 'amigos'
+// Visibilidades permitidas (incluye "amigos")
 export const VISIBILIDADES_PERMITIDAS = ['publico', 'privado', 'amigos'];
 
-// Acepta URLs http(s) o rutas relativas del propio servidor (/uploads/...)
+// Permite URLs absolutas (http/https) y rutas relativas /uploads
 const URL_OK = /^(https?:\/\/|\/)/i;
 
 const TarjetaSchema = new Schema(
@@ -45,7 +48,7 @@ const TarjetaSchema = new Schema(
       maxlength: 1000,
     },
 
-    // Mínimo 1 imagen, máximo 10. Se normalizan (trim) y se validan como URL/ruta.
+    // Imágenes normalizadas
     imagenes: {
       type: [String],
       default: [],
@@ -61,7 +64,6 @@ const TarjetaSchema = new Schema(
           message: 'Máximo 10 imágenes',
         },
         {
-          // Permite 0 imágenes sólo si existe el campo legado 'imagenUrl'
           validator(arr) {
             const hasLegacy =
               !!(this && typeof this.imagenUrl === 'string' && this.imagenUrl.trim());
@@ -78,7 +80,7 @@ const TarjetaSchema = new Schema(
       ],
     },
 
-    // Vídeo opcional (se valida sólo si viene)
+    // ——— Vídeo opcional ———
     videoUrl: {
       type: String,
       default: '',
@@ -90,13 +92,13 @@ const TarjetaSchema = new Schema(
       },
     },
 
-    // Compatibilidad con versiones antiguas (si no hay 'imagenes')
+    // Campo legado (compatibilidad)
     imagenUrl: { type: String, default: '' },
 
     // ——— Visibilidad y etiquetas ———
     visibilidad: {
       type: String,
-      enum: VISIBILIDADES_PERMITIDAS, // ← ahora soporta 'amigos'
+      enum: VISIBILIDADES_PERMITIDAS,
       required: true,
       default: 'privado',
       index: true,
@@ -114,14 +116,13 @@ const TarjetaSchema = new Schema(
       },
     },
 
-    // ——— Moderación / Soft delete (no se borra físicamente) ———
+    // ——— Moderación / Soft delete ———
     eliminado: { type: Boolean, default: false, index: true },
     eliminadoPor: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
     eliminadoEn: { type: Date, default: null },
     motivoEliminacion: { type: String, default: '' },
 
-    // ——— Ubicación opcional ———
-    // Si envías uno, debes enviar ambos (lat y lng)
+    // ——— Ubicación opcional (lat/lng deben venir juntos) ———
     lat: {
       type: Number,
       min: -90,
@@ -148,17 +149,17 @@ const TarjetaSchema = new Schema(
     },
   },
   {
-    // Timestamps automáticos + serialización limpia
     timestamps: true,
     toJSON: { virtuals: true, versionKey: false },
     toObject: { virtuals: true, versionKey: false },
   }
 );
 
-// ——— Índices útiles para consultas y panel ———
+// ——— Índices ———
 TarjetaSchema.index({ createdAt: -1 });
 TarjetaSchema.index({ titulo: 'text', descripcion: 'text' });
 TarjetaSchema.index({ eliminado: 1, createdAt: -1 });
 
-// Evita OverwriteModelError en dev/hot-reload
-export default mongoose.models.Tarjeta || mongoose.model('Tarjeta', TarjetaSchema);
+// Evitar OverwriteModelError en hot reload
+export default mongoose.models.Tarjeta ||
+  mongoose.model('Tarjeta', TarjetaSchema);

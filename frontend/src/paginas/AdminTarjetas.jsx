@@ -1,9 +1,8 @@
 // src/paginas/AdminTarjetas.jsx
-// Panel de administración: listar, filtrar, eliminar (soft) y restaurar tarjetas
+// Panel de administración para revisar, filtrar, eliminar (soft) y restaurar tarjetas.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// 👇 IMPORT CORREGIDO: usamos el nombre del servicio que exportamos
 import { adminTarjetasApi as adminTarjetas } from "../servicios/adminTarjetas";
 import { logout } from "../utils/auth";
 
@@ -16,7 +15,7 @@ export default function AdminTarjetas() {
     total: 0,
   });
 
-  // Filtros / parámetros de consulta
+  // Filtros de búsqueda y paginación
   const [f, setF] = useState({
     q: "",
     et: "",
@@ -41,7 +40,6 @@ export default function AdminTarjetas() {
         incDel: params.incDel ? 1 : 0,
       };
 
-      // 👇 aquí pasamos bien los dos argumentos: filtros + opciones (signal)
       const r = await adminTarjetas.listar(filtros, { signal: ctrl.signal });
 
       setEstado({
@@ -126,7 +124,7 @@ export default function AdminTarjetas() {
     }
   };
 
-  // Badge para visibilidad (incluye 'amigos')
+  // Badge para mostrar visibilidad (incluye 'amigos')
   const VisBadge = ({ vis }) => {
     const v = String(vis || "").toLowerCase();
     if (v === "publico")
@@ -138,7 +136,7 @@ export default function AdminTarjetas() {
     return <span className="badge bg-light text-dark">{vis || "—"}</span>;
   };
 
-  // Pequeño resumen local de estado
+  // Resumen rápido de activas / eliminadas en la tabla actual
   const resumen = useMemo(() => {
     const arr = estado.items || [];
     let activas = 0;
@@ -297,15 +295,15 @@ export default function AdminTarjetas() {
         </div>
       </form>
 
-      {/* Estados */}
+      {/* Estados de carga / error */}
       {estado.error && (
         <div className="alert alert-danger" role="alert">
           {estado.error}
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="table-responsive">
+      {/* ====== VISTA ESCRITORIO / TABLET: TABLA ====== */}
+      <div className="table-responsive d-none d-md-block">
         <table className="table table-hover align-middle">
           <thead>
             <tr>
@@ -392,7 +390,92 @@ export default function AdminTarjetas() {
         </table>
       </div>
 
-      {/* Paginación simple */}
+      {/* ====== VISTA MÓVIL: TARJETAS ====== */}
+      <div className="d-md-none">
+        {estado.cargando ? (
+          <div className="text-center text-muted my-3">Cargando…</div>
+        ) : (estado.items || []).length === 0 ? (
+          <div className="text-muted my-3">Sin resultados</div>
+        ) : (
+          <div className="d-flex flex-column gap-2">
+            {(estado.items || []).map((it) => (
+              <div
+                key={it._id}
+                className={`card shadow-sm ${
+                  it.eliminado ? "border-warning" : "border-0"
+                }`}
+              >
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-start mb-1">
+                    <h2 className="h6 mb-0">{it.titulo}</h2>
+                    <VisBadge vis={it.visibilidad} />
+                  </div>
+
+                  <div className="text-muted small mb-1">
+                    {it.usuario?.nombre || "—"}
+                    {it.usuario?.email && (
+                      <>
+                        {" · "}
+                        <span>{it.usuario.email}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {(it.etiquetas || []).length > 0 && (
+                    <div className="small mb-1">
+                      <span className="text-muted">Etiquetas: </span>
+                      {(it.etiquetas || []).join(", ")}
+                    </div>
+                  )}
+
+                  <div className="small mb-2">
+                    <span className="text-muted">Estado: </span>
+                    {it.eliminado ? (
+                      <span className="badge bg-warning text-dark">
+                        Eliminada
+                      </span>
+                    ) : (
+                      <span className="badge bg-success">Activa</span>
+                    )}
+                  </div>
+
+                  <div className="small text-muted mb-2">
+                    Creada: {new Date(it.createdAt).toLocaleString()}
+                  </div>
+
+                  <div className="d-flex flex-wrap gap-2 mt-2">
+                    {!it.eliminado ? (
+                      <button
+                        className="btn btn-sm btn-outline-danger flex-fill"
+                        onClick={() => eliminar(it._id)}
+                      >
+                        <i className="bi bi-trash" /> Eliminar
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-sm btn-outline-success flex-fill"
+                        onClick={() => restaurar(it._id)}
+                      >
+                        <i className="bi bi-arrow-counterclockwise" /> Restaurar
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-sm btn-outline-secondary flex-fill"
+                      onClick={() =>
+                        window.open(`/tarjetas/${it._id}`, "_blank")
+                      }
+                    >
+                      Ver
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Paginación sencilla */}
       <div className="d-flex justify-content-between align-items-center mt-3">
         <div className="text-muted small">Total: {estado.total}</div>
         <div className="btn-group">

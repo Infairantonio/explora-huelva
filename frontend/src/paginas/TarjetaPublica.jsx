@@ -1,10 +1,7 @@
 // src/paginas/TarjetaPublica.jsx
-// ---------------------------------------------------------------------------
-// DETALLE DE TARJETA + COMENTARIOS
-// Nueva regla: si el usuario está logueado, puede comentar SIEMPRE,
-// ya que si ve la tarjeta es porque el backend le dio permiso.
-// Visitantes solo comentan públicas.
-// ---------------------------------------------------------------------------
+// Página de detalle de una tarjeta y sus comentarios.
+// Regla de negocio: si el usuario está identificado, puede comentar siempre
+// que vea la tarjeta. Los visitantes solo comentan en tarjetas públicas.
 
 import {
   useEffect,
@@ -24,7 +21,9 @@ import { comentariosApi } from "../servicios/comentarios";
 import { getPerfil } from "../servicios/api";
 import { tarjetasApi } from "../servicios/tarjetas";
 
-// ------------------------- Helpers ---------------------------- //
+// ---------------------------------------------------------------------------
+// Funciones auxiliares
+// ---------------------------------------------------------------------------
 
 const sanitizeUrl = (url = "") => {
   try {
@@ -83,7 +82,9 @@ const isAbortError = (e) =>
   e?.code === "ERR_CANCELED" ||
   /abort(ed)?/i.test(e?.message || "");
 
-// ----------------------------- Lightbox ----------------------------- //
+// ---------------------------------------------------------------------------
+// Lightbox de imágenes
+// ---------------------------------------------------------------------------
 
 function Lightbox({ open, imagenes, index, onClose, onPrev, onNext }) {
   if (!open || !imagenes?.length) return null;
@@ -148,9 +149,9 @@ function Lightbox({ open, imagenes, index, onClose, onPrev, onNext }) {
   );
 }
 
-// ====================================================================
-//                    COMPONENTE PRINCIPAL
-// ====================================================================
+// ---------------------------------------------------------------------------
+// Componente principal
+// ---------------------------------------------------------------------------
 
 export default function TarjetaPublica() {
   const navigate = useNavigate();
@@ -158,6 +159,7 @@ export default function TarjetaPublica() {
   const [params, setParams] = useSearchParams();
   const page = Math.max(parseInt(params.get("page") || "1", 10), 1);
 
+  // Datos principales
   const [tarjeta, setTarjeta] = useState(null);
   const [comentarios, setComentarios] = useState([]);
   const [meta, setMeta] = useState({
@@ -168,6 +170,7 @@ export default function TarjetaPublica() {
   });
   const [yo, setYo] = useState(null);
 
+  // Estados de carga / error
   const [cargandoTarjeta, setCargandoTarjeta] = useState(true);
   const [cargandoComentarios, setCargandoComentarios] = useState(true);
   const [enviando, setEnviando] = useState(false);
@@ -175,9 +178,11 @@ export default function TarjetaPublica() {
   const [msgTarjeta, setMsgTarjeta] = useState("");
   const [msgComentarios, setMsgComentarios] = useState("");
 
+  // Formulario de comentario
   const [texto, setTexto] = useState("");
   const abortRef = useRef(null);
 
+  // Botón flotante "volver"
   const [showBackFab, setShowBackFab] = useState(false);
 
   useEffect(() => {
@@ -186,7 +191,9 @@ export default function TarjetaPublica() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ------------------------------ Lightbox ------------------------------ //
+  // -------------------------------------------------------------------------
+  // Imágenes y lightbox
+  // -------------------------------------------------------------------------
 
   const imagenes = useMemo(
     () =>
@@ -215,9 +222,9 @@ export default function TarjetaPublica() {
     [imagenes.length]
   );
 
-  // ====================================================================
-  //                      CARGAR TARJETA
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Carga de la tarjeta
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     let cancel = false;
@@ -227,6 +234,7 @@ export default function TarjetaPublica() {
       setMsgTarjeta("");
 
       try {
+        // Intento como tarjeta del usuario (privada)
         const rPriv = await tarjetasApi.una(id);
         if (!cancel) {
           setTarjeta(rPriv.tarjeta || rPriv.item || rPriv);
@@ -235,6 +243,7 @@ export default function TarjetaPublica() {
         }
       } catch (e) {
         if (isAbortError(e) || cancel) return;
+        // Si no es un error de permisos/404, mostramos el mensaje
         if (![401, 403, 404].includes(e?.status)) {
           setMsgTarjeta(e.message || "No se pudo cargar la tarjeta");
           setCargandoTarjeta(false);
@@ -242,6 +251,7 @@ export default function TarjetaPublica() {
         }
       }
 
+      // Si no es propia, se intenta como pública
       try {
         const rPub = await tarjetasApi.publicaUna(id);
         if (!cancel) setTarjeta(rPub.tarjeta || rPub.item || rPub);
@@ -259,9 +269,9 @@ export default function TarjetaPublica() {
     };
   }, [id]);
 
-  // ====================================================================
-  //                 CARGAR PERFIL DEL USUARIO
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Perfil del usuario actual
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     let cancel = false;
@@ -280,9 +290,12 @@ export default function TarjetaPublica() {
     };
   }, []);
 
-  // ====================================================================
-  //                 CARGAR COMENTARIOS (REGLA NUEVA)
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Carga de comentarios
+  // -------------------------------------------------------------------------
+  // Regla de comentarios:
+  // - Usuario identificado: puede comentar siempre que vea la tarjeta.
+  // - Visitante: solo en tarjetas con visibilidad "público".
 
   useEffect(() => {
     if (!tarjeta) return;
@@ -290,9 +303,6 @@ export default function TarjetaPublica() {
     const vis = (tarjeta.visibilidad || "").toLowerCase();
     const usuarioLogueado = Boolean(yo);
 
-    // 🔥 REGLA NUEVA:
-    // - Si estás logueado → puedes comentar SIEMPRE.
-    // - Si no estás logueado → solo públicas.
     const usuarioPuedeComentar = usuarioLogueado || vis === "publico";
 
     if (!usuarioPuedeComentar) {
@@ -331,9 +341,9 @@ export default function TarjetaPublica() {
     return () => controller.abort();
   }, [id, page, tarjeta, yo]);
 
-  // ====================================================================
-  //                    ENVIAR COMENTARIO
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Envío de un nuevo comentario
+  // -------------------------------------------------------------------------
 
   const enviarComentario = async (e) => {
     e.preventDefault();
@@ -356,9 +366,9 @@ export default function TarjetaPublica() {
     }
   };
 
-  // ====================================================================
-  //                             BORRAR
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Borrado de comentarios
+  // -------------------------------------------------------------------------
 
   const puedeBorrar = useMemo(() => {
     if (!yo || !tarjeta) return () => false;
@@ -388,9 +398,9 @@ export default function TarjetaPublica() {
     }
   };
 
-  // ====================================================================
-  //                           PAGINACIÓN
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Paginación de comentarios
+  // -------------------------------------------------------------------------
 
   const irPagina = (p) => {
     const n = Math.max(1, Math.min(p, meta.pages || 1));
@@ -401,7 +411,9 @@ export default function TarjetaPublica() {
     });
   };
 
-  // ----------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Datos derivados para la vista
+  // -------------------------------------------------------------------------
 
   const portada = imagenes[0] || "";
   const vis = (tarjeta?.visibilidad || "").toLowerCase();
@@ -419,7 +431,6 @@ export default function TarjetaPublica() {
       : "bg-secondary";
 
   const usuarioLogueado = Boolean(yo);
-
   const usuarioPuedeComentar = usuarioLogueado || vis === "publico";
 
   const mapsUrl = buildMapsUrl(tarjeta?.lat, tarjeta?.lng);
@@ -429,9 +440,9 @@ export default function TarjetaPublica() {
     ? new Date(tarjeta.createdAt)
     : null;
 
-  // ====================================================================
-  //                             RENDER
-  // ====================================================================
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <main className="container py-4">
@@ -445,7 +456,7 @@ export default function TarjetaPublica() {
         </button>
       </div>
 
-      {/* ---------------- TARJETA ---------------- */}
+      {/* Tarjeta */}
       {cargandoTarjeta ? (
         <div className="d-flex align-items-center gap-2 mb-4">
           <div className="spinner-border" />
@@ -459,7 +470,7 @@ export default function TarjetaPublica() {
         <section className="row justify-content-center mb-4">
           <article className="col-12 col-lg-9 col-xl-8">
             <div className="card border-0 shadow-sm">
-              {/* ---- Cabecera ---- */}
+              {/* Cabecera */}
               <header className="card-body border-bottom d-flex align-items-start justify-content-between gap-3">
                 <div className="d-flex align-items-start gap-2">
                   <div
@@ -515,7 +526,7 @@ export default function TarjetaPublica() {
                 )}
               </header>
 
-              {/* ---- Imagen ---- */}
+              {/* Imagen principal */}
               {portada && (
                 <div className="bg-dark">
                   <img
@@ -527,13 +538,14 @@ export default function TarjetaPublica() {
                 </div>
               )}
 
-              {/* ---- Cuerpo ---- */}
+              {/* Cuerpo */}
               <div className="card-body">
-                {/* ⬇️ Aquí respetamos los saltos de línea */}
+                {/* Descripción (respetando saltos de línea vía CSS) */}
                 <p className="mb-3 descripcion-tarjeta">
                   {tarjeta.descripcion || "—"}
                 </p>
 
+                {/* Miniaturas adicionales */}
                 {imagenes.length > 1 && (
                   <div className="mb-3">
                     <div className="d-flex flex-wrap gap-2">
@@ -560,6 +572,7 @@ export default function TarjetaPublica() {
                   </div>
                 )}
 
+                {/* Vídeo embebido */}
                 {embed && (
                   <div className="mt-3">
                     <div className="ratio ratio-16x9">
@@ -588,7 +601,7 @@ export default function TarjetaPublica() {
         onNext={nextLb}
       />
 
-      {/* ------------------ COMENTARIOS ------------------ */}
+      {/* Comentarios */}
       <section className="row justify-content-center mt-4">
         <div className="col-12 col-lg-9 col-xl-8">
           <div className="card border-0 shadow-sm">
@@ -600,7 +613,7 @@ export default function TarjetaPublica() {
                 </span>
               </div>
 
-              {/* Si NO puede comentar */}
+              {/* Si no puede comentar */}
               {!usuarioPuedeComentar ? (
                 <div className="alert alert-info">
                   Comentarios no disponibles para esta tarjeta.
@@ -612,7 +625,7 @@ export default function TarjetaPublica() {
                 </div>
               ) : (
                 <>
-                  {/* Formulario */}
+                  {/* Formulario de comentario (solo para usuarios con sesión) */}
                   {yo && (
                     <form onSubmit={enviarComentario} className="mb-4">
                       {msgComentarios && (
@@ -640,7 +653,7 @@ export default function TarjetaPublica() {
                     </form>
                   )}
 
-                  {/* Si es público y no logueado */}
+                  {/* Aviso para visitantes en tarjetas públicas */}
                   {!yo && vis === "publico" && (
                     <div className="alert alert-info">
                       Para comentar necesitas iniciar sesión.{" "}
@@ -650,7 +663,7 @@ export default function TarjetaPublica() {
                     </div>
                   )}
 
-                  {/* Lista */}
+                  {/* Lista de comentarios */}
                   {cargandoComentarios ? (
                     <div className="d-flex align-items-center gap-2">
                       <div className="spinner-border" />
@@ -684,7 +697,7 @@ export default function TarjetaPublica() {
                                     ).toLocaleString()}
                                   </span>
                                 </div>
-                                {/* ⬇️ Comentario con saltos de línea */}
+                                {/* Texto del comentario con formato de párrafo */}
                                 <div className="mt-1 descripcion-tarjeta">
                                   {c.texto}
                                 </div>
@@ -705,7 +718,7 @@ export default function TarjetaPublica() {
                     </ul>
                   )}
 
-                  {/* Paginación */}
+                  {/* Paginación de comentarios */}
                   {meta.pages > 1 && (
                     <div className="d-flex justify-content-between align-items-center mt-3">
                       <button
@@ -736,7 +749,7 @@ export default function TarjetaPublica() {
         </div>
       </section>
 
-      {/* FAB volver */}
+      {/* Botón flotante para volver atrás */}
       {showBackFab && (
         <button
           className="btn btn-primary rounded-pill position-fixed d-flex align-items-center justify-content-center"

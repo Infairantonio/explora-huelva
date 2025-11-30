@@ -1,7 +1,15 @@
+// backend/src/rutas/amigos.ruta.js
 // ————————————————————————————————————————————————————
-// Rutas REST para "amigos"
-// Prefijo: /api/amigos
+// Rutas REST para gestión de amigos
+// Prefijo final: /api/amigos/*
+// Funcionalidades:
+//   - Buscar usuarios para añadir como amigos
+//   - Enviar / aceptar / rechazar / cancelar solicitudes
+//   - Listar amigos
+//   - Eliminar amistad
+// Requiere autenticación JWT
 // ————————————————————————————————————————————————————
+
 import { Router } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import autenticacion from '../middleware/autenticacion.js';
@@ -9,13 +17,20 @@ import * as ctrl from '../controladores/amigos.controlador.js';
 
 const router = Router();
 
+// Middleware de validación reutilizable
 const validar = (req, res, next) => {
-  const errs = validationResult(req);
-  if (!errs.isEmpty()) return res.status(422).json({ ok: false, errores: errs.array() });
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ ok: false, errores: errors.array() });
+  }
   next();
 };
 
-// Buscar usuarios (excluye a ti y relaciones ya existentes)
+// ————————————————————————————————————————————————————
+// GET /api/amigos/buscar-usuarios
+// Buscar posibles usuarios para enviar amistad
+// (excluye al propio usuario y relaciones ya creadas)
+// ————————————————————————————————————————————————————
 router.get(
   '/buscar-usuarios',
   autenticacion,
@@ -23,18 +38,27 @@ router.get(
     query('q').optional().isString().isLength({ max: 80 }),
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
-    validar,
   ],
+  validar,
   ctrl.buscarUsuarios
 );
 
-// Listar mis amigos
+// ————————————————————————————————————————————————————
+// GET /api/amigos
+// Lista de amigos ya aceptados
+// ————————————————————————————————————————————————————
 router.get('/', autenticacion, ctrl.listarAmigos);
 
-// Listar solicitudes pendientes (recibidas y enviadas)
+// ————————————————————————————————————————————————————
+// GET /api/amigos/pendientes
+// Solicitudes enviadas y recibidas en estado "pendiente"
+// ————————————————————————————————————————————————————
 router.get('/pendientes', autenticacion, ctrl.listarPendientes);
 
-// Enviar solicitud
+// ————————————————————————————————————————————————————
+// POST /api/amigos/solicitar
+// Enviar solicitud a otro usuario
+// ————————————————————————————————————————————————————
 router.post(
   '/solicitar',
   autenticacion,
@@ -43,7 +67,10 @@ router.post(
   ctrl.enviarSolicitud
 );
 
-// Cancelar mi solicitud (la que YO envié y aún está pendiente)
+// ————————————————————————————————————————————————————
+// POST /api/amigos/cancelar
+// Cancelar una solicitud que YO he enviado (si sigue pendiente)
+// ————————————————————————————————————————————————————
 router.post(
   '/cancelar',
   autenticacion,
@@ -52,7 +79,10 @@ router.post(
   ctrl.cancelarSolicitud
 );
 
-// Aceptar solicitud recibida (la que ELLOS me enviaron)
+// ————————————————————————————————————————————————————
+// POST /api/amigos/aceptar
+// Aceptar una solicitud recibida de otro usuario
+// ————————————————————————————————————————————————————
 router.post(
   '/aceptar',
   autenticacion,
@@ -61,7 +91,10 @@ router.post(
   ctrl.aceptarSolicitud
 );
 
+// ————————————————————————————————————————————————————
+// POST /api/amigos/rechazar
 // Rechazar solicitud recibida
+// ————————————————————————————————————————————————————
 router.post(
   '/rechazar',
   autenticacion,
@@ -70,7 +103,10 @@ router.post(
   ctrl.rechazarSolicitud
 );
 
-// Eliminar amistad (si ya estaba aceptada)
+// ————————————————————————————————————————————————————
+// DELETE /api/amigos/:usuarioId
+// Eliminar amistad ya aceptada
+// ————————————————————————————————————————————————————
 router.delete(
   '/:usuarioId',
   autenticacion,

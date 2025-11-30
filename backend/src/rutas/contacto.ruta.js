@@ -1,6 +1,6 @@
 // backend/src/rutas/contacto.ruta.js
 // ————————————————————————————————————————————————
-// Ruta muy sencilla para contacto / newsletter.
+// Rutas de contacto / newsletter.
 // POST /api/contacto
 // ————————————————————————————————————————————————
 

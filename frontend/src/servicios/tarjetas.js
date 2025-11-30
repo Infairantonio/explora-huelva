@@ -1,23 +1,22 @@
-import { API_URL, getToken } from './api';
+// src/servicios/tarjetas.js
+// Servicio para gestionar tarjetas: públicas, de amigos, propias y administración.
 
-// =========================================================
-// Header Authorization dinámico
-// =========================================================
+import { API_URL, getToken } from "./api";
+
+// Cabecera con token si está disponible
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
-// =========================================================
-// Parse genérico con throw si !res.ok
-// =========================================================
+// Manejo estándar de respuestas de la API
 async function handle(res) {
-  const ct = res.headers.get('content-type') || '';
-  const isJson = ct.includes('application/json');
+  const ct = res.headers.get("content-type") || "";
+  const isJson = ct.includes("application/json");
   const data = isJson ? await res.json().catch(() => ({})) : await res.text();
 
   if (!res.ok) {
-    const msg = (isJson && data?.mensaje) || res.statusText || 'Error de red';
+    const msg = (isJson && data?.mensaje) || res.statusText || "Error de red";
     const err = new Error(msg);
     err.status = res.status;
     err.payload = data;
@@ -26,29 +25,22 @@ async function handle(res) {
   return data;
 }
 
-// =========================================================
-// Helper querystring
-// =========================================================
+// Construcción de querystring limpia
 const qs = (obj = {}) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || v === null || v === '') continue;
+    if (v === undefined || v === null || v === "") continue;
     p.set(k, v);
   }
   const s = p.toString();
-  return s ? `?${s}` : '';
+  return s ? `?${s}` : "";
 };
 
-// =========================================================
-// API TARJETAS COMPLETA
-// =========================================================
 export const tarjetasApi = {
-  // -----------------------------------------------------
-  // 1) Públicas generales
-  // -----------------------------------------------------
+  // 1) Tarjetas públicas generales
   async publicas(params = {}) {
     const r = await fetch(`${API_URL}/tarjetas/publicas${qs(params)}`, {
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
@@ -56,31 +48,27 @@ export const tarjetasApi = {
   async publicaUna(id, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas/publicas/${id}`, {
       ...options,
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
 
-  // -----------------------------------------------------
-  // 2) Amigos (privado con token)
-  // -----------------------------------------------------
+  // 2) Tarjetas de amigos (requiere token)
   async amigos(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas/amigos${qs(params)}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
 
-  // -----------------------------------------------------
-  // 3) Mis tarjetas (privado con token)
-  // -----------------------------------------------------
+  // 3) Mis tarjetas (requiere token)
   async mias(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas/mias${qs(params)}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
@@ -89,19 +77,17 @@ export const tarjetasApi = {
     const r = await fetch(`${API_URL}/tarjetas/${id}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
 
-  // -----------------------------------------------------
-  // 4) Crear / Actualizar / Eliminar (usuario normal)
-  // -----------------------------------------------------
+  // 4) Crear / actualizar / eliminar tarjeta (usuario)
   async crear(payload, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...authHeader(),
         ...(options.headers || {}),
       },
@@ -113,9 +99,9 @@ export const tarjetasApi = {
 
   async actualizar(id, payload, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...authHeader(),
         ...(options.headers || {}),
       },
@@ -127,37 +113,33 @@ export const tarjetasApi = {
 
   async eliminar(id, options = {}) {
     const r = await fetch(`${API_URL}/tarjetas/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: { ...authHeader(), ...(options.headers || {}) },
       ...options,
     });
     return handle(r);
   },
 
-  // -----------------------------------------------------
-  // 5) Subida de imágenes
-  // -----------------------------------------------------
+  // 5) Subida de imágenes para tarjetas
   async subirImagen(file, options = {}) {
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append("file", file);
 
     const r = await fetch(`${API_URL}/tarjetas/subir-imagen`, {
-      method: 'POST',
-      headers: { ...authHeader(), ...(options.headers || {}) }, // no pongas Content-Type
+      method: "POST",
+      headers: { ...authHeader(), ...(options.headers || {}) }, // no forzar Content-Type
       body: fd,
       ...options,
     });
     return handle(r);
   },
 
-  // ======================================================
-  // 6) 🔥 ADMIN: Gestión completa de tarjetas
-  // ======================================================
+  // 6) Administración de tarjetas (panel admin)
   async adminListar(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas${qs(params)}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
@@ -166,16 +148,16 @@ export const tarjetasApi = {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
       ...options,
       headers: { ...authHeader(), ...(options.headers || {}) },
-      cache: 'no-store',
+      cache: "no-store",
     });
     return handle(r);
   },
 
-  async adminEliminar(id, motivo = '', options = {}) {
+  async adminEliminar(id, motivo = "", options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...authHeader(),
         ...(options.headers || {}),
       },
@@ -187,7 +169,7 @@ export const tarjetasApi = {
 
   async adminRestaurar(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}/restaurar`, {
-      method: 'POST',
+      method: "POST",
       headers: { ...authHeader(), ...(options.headers || {}) },
       ...options,
     });

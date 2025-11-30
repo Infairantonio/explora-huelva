@@ -1,23 +1,22 @@
 // src/paginas/Panel.jsx
-// Panel privado del usuario donde gestiona sus tarjetas
-// - Carga las tarjetas del usuario autenticado (con cancelación segura)
-// - Permite refrescar la lista
-// - Navegar a crear/editar
-// - Eliminar con borrado optimista y fallback claro
+// Panel privado del usuario para gestionar sus tarjetas:
+// - Lista las tarjetas propias
+// - Permite recargar, crear, editar y eliminar
+// - Muestra botón de panel de administración si el usuario es admin
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { tarjetasApi } from "../servicios/tarjetas";
 import { logout } from "../utils/auth";
 import TarjetaCard from "../componentes/TarjetaCard.jsx";
-import { getPerfil } from "../servicios/api"; // 👈 NUEVO
+import { getPerfil } from "../servicios/api";
 
-// Helper opcional para tomar la primera imagen válida ya lista para <img src="">
+// Devuelve una imagen principal para mostrar en la tarjeta
 const pickFoto = (t) => {
   if (!t) return null;
   const arr = Array.isArray(t.imagenes) ? t.imagenes : [];
-  if (arr.length && typeof arr[0] === "string") return arr[0]; // p.ej. "/api/uploads/xxx.jpg"
-  if (t.imagenUrl && typeof t.imagenUrl === "string") return t.imagenUrl; // legacy
+  if (arr.length && typeof arr[0] === "string") return arr[0];
+  if (t.imagenUrl && typeof t.imagenUrl === "string") return t.imagenUrl;
   return null;
 };
 
@@ -25,72 +24,64 @@ export default function Panel() {
   const [items, setItems] = useState([]);
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(true);
-  const [esAdmin, setEsAdmin] = useState(false); // 👈 NUEVO
+  const [esAdmin, setEsAdmin] = useState(false);
 
   const navigate = useNavigate();
   const abortRef = useRef(null);
 
-  const cargar = useCallback(
-    async () => {
-      setMensaje("");
-      setCargando(true);
+  // Carga las tarjetas del usuario
+  const cargar = useCallback(async () => {
+    setMensaje("");
+    setCargando(true);
 
-      // Cancela fetches previos si los hubiera
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
+    // Cancela peticiones anteriores en curso
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-      try {
-        // ✅ signal en el 2º argumento (options), no en params
-        const r = await tarjetasApi.mias({}, { signal: controller.signal });
-        // La API devuelve { ok, items, meta }; items ya trae imagenes como "/api/uploads/..."
-        const arr = Array.isArray(r.items) ? r.items : [];
-        setItems(arr);
-      } catch (e) {
-        // Ignora aborts intencionales
-        if (e?.name === "AbortError") return;
+    try {
+      const r = await tarjetasApi.mias({}, { signal: controller.signal });
+      const arr = Array.isArray(r.items) ? r.items : [];
+      setItems(arr);
+    } catch (e) {
+      if (e?.name === "AbortError") return;
 
-        // ✅ 401 se maneja aquí (handle() ya lanzó el error)
-        if (e?.status === 401) {
-          logout();
-          navigate("/login", {
-            replace: true,
-            state: { from: { pathname: "/panel" } },
-          });
-          return;
-        }
-
-        setMensaje(e?.message || "Error de red");
-        setItems([]);
-      } finally {
-        setCargando(false);
+      if (e?.status === 401) {
+        logout();
+        navigate("/login", {
+          replace: true,
+          state: { from: { pathname: "/panel" } },
+        });
+        return;
       }
-    },
-    [navigate]
-  );
+
+      setMensaje(e?.message || "Error de red");
+      setItems([]);
+    } finally {
+      setCargando(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
-    // Cargar tarjetas del usuario
+    // 1) Tarjetas del usuario
     cargar();
 
-    // Cargar perfil para saber si es admin
+    // 2) Perfil para saber si tiene rol administrador
     (async () => {
       try {
         const perfil = await getPerfil();
         const rol = perfil?.usuario?.rol || perfil?.rol;
-        if (rol === "admin") {
-          setEsAdmin(true);
-        }
-      } catch (e) {
-        // Si falla, simplemente no mostramos el botón admin
+        if (rol === "admin") setEsAdmin(true);
+      } catch {
+        // Si falla, simplemente no mostramos el botón de administración
       }
     })();
 
-    // Cleanup al desmontar: aborta la petición en vuelo
+    // Al desmontar, cancelar la petición en curso
     return () => abortRef.current?.abort();
   }, [cargar]);
 
-  // Eliminar con borrado optimista
+  // Elimina una tarjeta con borrado optimista
   const eliminar = async (id) => {
     if (!window.confirm("¿Eliminar esta tarjeta?")) return;
 
@@ -100,16 +91,16 @@ export default function Panel() {
     try {
       const r = await tarjetasApi.eliminar(id);
       if (!r?.ok) {
-        setItems(copia); // revertir
+        setItems(copia);
         alert(r?.mensaje || "No se pudo eliminar");
       }
     } catch (e) {
-      setItems(copia); // revertir
+      setItems(copia);
       alert(e?.message || "Error de red al eliminar");
     }
   };
 
-  // 🔒 Red de seguridad: no mostrar eliminadas en el panel
+  // No se muestran tarjetas marcadas como eliminadas
   const visibles = (items || []).filter((it) => !it?.eliminado);
 
   return (
@@ -123,7 +114,7 @@ export default function Panel() {
           ) : null}
         </h1>
         <div className="d-flex gap-2">
-          {/* 👇 SOLO admins verán este botón */}
+          {/* Botón de panel de administración solo para usuarios con rol admin */}
           {esAdmin && (
             <button
               type="button"
@@ -134,17 +125,16 @@ export default function Panel() {
             </button>
           )}
 
-          {/* Botón Amigos */}
+          {/* Sección de amigos */}
           <Link
             to="/panel/amigos"
-            className={`btn btn-outline-primary ${
-              cargando ? "disabled" : ""
-            }`}
+            className={`btn btn-outline-primary ${cargando ? "disabled" : ""}`}
             aria-disabled={cargando}
           >
             <i className="bi bi-people me-1" /> Amigos
           </Link>
 
+          {/* Recargar listado */}
           <button
             className="btn btn-outline-secondary"
             onClick={cargar}
@@ -153,6 +143,8 @@ export default function Panel() {
             <i className="bi bi-arrow-clockwise me-1" />{" "}
             {cargando ? "Cargando…" : "Recargar"}
           </button>
+
+          {/* Crear nueva tarjeta */}
           <Link
             to="/panel/nuevo"
             className={`btn btn-primary ${cargando ? "disabled" : ""}`}
@@ -163,10 +155,10 @@ export default function Panel() {
         </div>
       </div>
 
-      {/* Mensaje de error */}
+      {/* Mensaje de error general */}
       {mensaje && <div className="alert alert-danger">{mensaje}</div>}
 
-      {/* Lista / estados */}
+      {/* Contenido principal según estado */}
       {cargando ? (
         <div
           className="d-flex align-items-center gap-2"
@@ -190,8 +182,8 @@ export default function Panel() {
                 detalleHref={`/tarjetas/${it._id}`}
                 onEdit={() => navigate(`/panel/editar/${it._id}`)}
                 onDelete={() => eliminar(it._id)}
-                // Si TarjetaCard permite prop 'imagen', puedes pasar pickFoto(it)
-                // imagen={pickFoto(it)}
+                // Si en el futuro TarjetaCard acepta una prop "imagen",
+                // se podría usar: imagen={pickFoto(it)}
               />
             </div>
           ))}

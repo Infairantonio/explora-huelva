@@ -1,70 +1,68 @@
 // src/paginas/SobreNosotros.jsx
-// Página estática "Sobre nosotros" con Bootstrap
+// Página estática "Sobre nosotros" con diseño claro y contenido informativo.
 
 import { Link } from "react-router-dom";
 
 export default function SobreNosotros() {
   return (
     <div className="container py-5">
-      {/* Hero */}
+
+      {/* Encabezado principal */}
       <section className="text-center mb-5">
         <h1 className="display-6 fw-semibold">Sobre nosotros</h1>
         <p className="text-muted mx-auto" style={{ maxWidth: 720 }}>
-          Explora Huelva es un proyecto hecho con cariño para descubrir lugares,
-          rutas y experiencias únicas en la provincia. Nuestra misión es facilitar
-          que cualquiera pueda compartir y encontrar planes auténticos cerca.
+          Explora Huelva es un proyecto creado para descubrir lugares, rutas y 
+          experiencias únicas en la provincia. Nuestro objetivo es facilitar 
+          que cualquier persona pueda explorar, compartir y disfrutar de planes auténticos.
         </p>
       </section>
 
-      {/* Valores */}
+      {/* Valores principales */}
       <section className="row g-4 mb-5">
         <div className="col-12 col-md-4">
           <div className="card h-100 shadow-sm border-0">
             <div className="card-body">
-              <div className="mb-2 fs-3">
-                <i className="bi bi-map"></i>
-              </div>
-              <h3 className="h5">Local, útil y cercano</h3>
+              <div className="mb-2 fs-3"><i className="bi bi-map"></i></div>
+              <h3 className="h5">Local y cercano</h3>
               <p className="text-muted mb-0">
-                Contenido pensado para la gente de Huelva (y quienes la visitan),
-                con información práctica y actualizada por la comunidad.
+                Pensado para la gente de Huelva y quienes la visitan. Información útil,
+                práctica y actualizada por la comunidad.
               </p>
             </div>
           </div>
         </div>
+
         <div className="col-12 col-md-4">
           <div className="card h-100 shadow-sm border-0">
             <div className="card-body">
-              <div className="mb-2 fs-3">
-                <i className="bi bi-people"></i>
-              </div>
+              <div className="mb-2 fs-3"><i className="bi bi-people"></i></div>
               <h3 className="h5">Comunidad primero</h3>
               <p className="text-muted mb-0">
-                Las mejores recomendaciones vienen de personas reales. Priorizamos
-                transparencia, respeto y colaboración.
+                Las mejores recomendaciones vienen de personas reales. Fomentamos 
+                un espacio respetuoso y colaborativo.
               </p>
             </div>
           </div>
         </div>
+
         <div className="col-12 col-md-4">
           <div className="card h-100 shadow-sm border-0">
             <div className="card-body">
-              <div className="mb-2 fs-3">
-                <i className="bi bi-compass"></i>
-              </div>
-              <h3 className="h5">Explorar fácil</h3>
+              <div className="mb-2 fs-3"><i className="bi bi-compass"></i></div>
+              <h3 className="h5">Explorar es fácil</h3>
               <p className="text-muted mb-0">
-                Un panel sencillo para crear “tarjetas”, filtrar por etiquetas y
-                compartir planes sin complicaciones.
+                Crear tarjetas, añadir imágenes y organizar tus rutas es rápido y 
+                sencillo desde el panel personal.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Equipo (placeholder) */}
+      {/* Equipo (placeholder simple) */}
       <section className="mb-5">
         <h2 className="h4 mb-3">Quiénes somos</h2>
+
         <div className="row g-3">
           {[
             { nombre: "María", rol: "Contenido y comunidad" },
@@ -93,10 +91,12 @@ export default function SobreNosotros() {
         </div>
       </section>
 
-      {/* FAQ corta */}
+      {/* Preguntas frecuentes */}
       <section className="mb-5">
         <h2 className="h4 mb-3">Preguntas frecuentes</h2>
+
         <div className="accordion" id="faqSobre">
+
           <div className="accordion-item">
             <h2 className="accordion-header" id="faq1h">
               <button
@@ -117,8 +117,8 @@ export default function SobreNosotros() {
               data-bs-parent="#faqSobre"
             >
               <div className="accordion-body">
-                Entra en tu <strong>Panel</strong> y pulsa <em>Nueva</em>. Rellena
-                título, descripción, etiqueta y (opcionalmente) imágenes. ¡Listo!
+                Entra en tu <strong>Panel</strong> y pulsa <em>Nueva</em>. 
+                Rellena la información y guarda. En segundos estará publicada.
               </div>
             </div>
           </div>
@@ -136,6 +136,7 @@ export default function SobreNosotros() {
                 ¿Es gratis?
               </button>
             </h2>
+
             <div
               id="faq2"
               className="accordion-collapse collapse"
@@ -143,22 +144,21 @@ export default function SobreNosotros() {
               data-bs-parent="#faqSobre"
             >
               <div className="accordion-body">
-                Sí. El proyecto es abierto y gratuito. En el futuro podríamos
-                añadir funciones premium opcionales, pero la exploración básica
-                seguirá siendo libre.
+                Sí, es totalmente gratuito. En el futuro podrá haber funciones 
+                premium opcionales, pero la parte básica seguirá siendo libre.
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
+      {/* Llamada a la acción */}
       <section className="text-center">
         <div className="card border-0 shadow-sm">
           <div className="card-body">
-            <h3 className="h5">¿Te apuntas?</h3>
+            <h3 className="h5">¿Te unes?</h3>
             <p className="text-muted mb-3">
-              Crea tu cuenta y comparte el próximo plan en Huelva.
+              Regístrate y empieza a explorar la provincia de una forma diferente.
             </p>
             <Link to="/registro" className="btn btn-primary me-2">
               Crear cuenta

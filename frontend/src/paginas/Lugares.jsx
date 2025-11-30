@@ -1,8 +1,6 @@
 // src/paginas/Lugares.jsx
-// ————————————————————————————————————————————————
-// Listado público filtrado por etiqueta: /explorar/:etiqueta
-// Etiquetas válidas: lugares | experiencias | rutas
-// ————————————————————————————————————————————————
+// Listado público de tarjetas filtradas por categoría:
+// /explorar/:etiqueta con etiqueta = lugares | experiencias | rutas
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
@@ -24,7 +22,7 @@ export default function Lugares() {
   const { etiqueta: etiquetaParam } = useParams();
   const navigate = useNavigate();
 
-  // Fallback defensivo
+  // Etiqueta normalizada; si no llega, usamos "lugares" por defecto
   const etiqueta = (etiquetaParam || "lugares").toLowerCase();
 
   const [params, setParams] = useSearchParams();
@@ -42,7 +40,7 @@ export default function Lugares() {
     meta: { page: 1, pages: 1, total: 0, limit: LIMIT },
   });
 
-  // Redirige si etiqueta inválida
+  // Si la etiqueta no es válida, redirigimos a /explorar/lugares
   useEffect(() => {
     if (!etiquetaValida) {
       navigate("/explorar/lugares", { replace: true });
@@ -50,16 +48,23 @@ export default function Lugares() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etiquetaValida]);
 
-  // Carga de tarjetas
+  // Carga de tarjetas públicas filtradas por etiqueta y página
   useEffect(() => {
     let cancel = false;
+
     (async () => {
       if (!etiquetaValida) return;
+
       setEstado((e) => ({ ...e, cargando: true, error: "" }));
+
       try {
         const r = await tarjetasApi.publicas({ etiqueta, page, limit: LIMIT });
         if (cancel) return;
-        if (!r?.ok) throw new Error(r?.mensaje || "No se pudieron cargar las tarjetas");
+
+        if (!r?.ok) {
+          throw new Error(r?.mensaje || "No se pudieron cargar las tarjetas");
+        }
+
         setEstado({
           cargando: false,
           error: "",
@@ -76,9 +81,13 @@ export default function Lugares() {
         });
       }
     })();
-    return () => { cancel = true; };
+
+    return () => {
+      cancel = true;
+    };
   }, [etiqueta, etiquetaValida, page]);
 
+  // Actualiza la query ?page=n manteniendo el resto de parámetros
   const irPagina = (p) => {
     const n = Math.max(1, Math.min(p, estado.meta.pages || 1));
     setParams((cur) => {
@@ -90,7 +99,7 @@ export default function Lugares() {
 
   return (
     <div className="container py-4">
-      {/* Tabs de categorías */}
+      {/* Pestañas de categorías */}
       <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <h1 className="h4 mb-0">{tituloBonito(etiqueta)}</h1>
         <ul className="nav nav-pills">
@@ -98,7 +107,10 @@ export default function Lugares() {
             const active = t === etiqueta;
             return (
               <li key={t} className="nav-item">
-                <Link className={`nav-link ${active ? "active" : ""}`} to={`/explorar/${t}`}>
+                <Link
+                  className={`nav-link ${active ? "active" : ""}`}
+                  to={`/explorar/${t}`}
+                >
                   {tituloBonito(t)}
                 </Link>
               </li>
@@ -107,7 +119,7 @@ export default function Lugares() {
         </ul>
       </div>
 
-      {/* Estados */}
+      {/* Estados de carga / error / datos */}
       {estado.cargando ? (
         <div className="d-flex align-items-center gap-2">
           <div className="spinner-border" role="status" />
@@ -121,17 +133,16 @@ export default function Lugares() {
         </div>
       ) : (
         <>
-          {/* Grid */}
+          {/* Grid de tarjetas */}
           <div className="row g-3">
             {estado.items.map((it) => (
               <div key={it._id} className="col-12 col-sm-6 col-lg-4">
-                {/* El botón va dentro de la card mediante 'detalleHref' */}
                 <TarjetaCard item={it} detalleHref={`/tarjetas/${it._id}`} />
               </div>
             ))}
           </div>
 
-          {/* Paginación */}
+          {/* Paginación simple */}
           {estado.meta.pages > 1 && (
             <div className="d-flex justify-content-between align-items-center mt-3">
               <button
@@ -142,7 +153,8 @@ export default function Lugares() {
                 ← Anterior
               </button>
               <span className="small text-muted">
-                Página {estado.meta.page} de {estado.meta.pages} · {estado.meta.total} resultados
+                Página {estado.meta.page} de {estado.meta.pages} ·{" "}
+                {estado.meta.total} resultados
               </span>
               <button
                 className="btn btn-outline-secondary btn-sm"

@@ -1,8 +1,13 @@
 // backend/src/controladores/auth.controlador.js
 // ————————————————————————————————————————————————
-// Controlador de autenticación: registro, login, refresh, verificación y reset.
-// Mantiene contrato { ok, token, usuario } y usa cookie httpOnly 'refresh'.
+// Controlador de autenticación:
+//   - Registro con verificación por email
+//   - Inicio de sesión con JWT + refresh (cookie httpOnly)
+//   - Refresh de token, logout y cierre de todas las sesiones
+//   - Gestión de verificación de correo y reseteo de contraseña
+// Respuesta base: { ok, token?, usuario? }.
 // ————————————————————————————————————————————————
+
 import crypto from "crypto";
 import Usuario from "../modelos/usuario.modelo.js";
 import Sesion from "../modelos/sesion.modelo.js";
@@ -10,29 +15,36 @@ import { firmar, buildUserPayload } from "../utils/jwt.js";
 import { enviarCorreo } from "../utils/email.js";
 import { validarPasswordFuerte } from "../utils/validarPasswordFuerte.js";
 
-// ====== Config ======
+// Configuración básica
 const {
   JWT_EXP = "15m",
   NODE_ENV = "development",
   REFRESH_DIAS = "30",
   REFRESH_DIAS_REMEMBER = "60",
-  PUBLIC_URL = "http://localhost:5173", // Front para enlaces /verifica y /reset
+  PUBLIC_URL = "http://localhost:5173", // Front para /verifica y /reset
 } = process.env;
+
 const isProd = NODE_ENV === "production";
 
-const firmarJWT = (usuario) => firmar(buildUserPayload(usuario), { exp: JWT_EXP });
+const firmarJWT = (usuario) =>
+  firmar(buildUserPayload(usuario), { exp: JWT_EXP });
+
 const emailValido = (email) => /.+@.+\..+/.test(email);
 
-// ====== Helpers ======
+// Helpers para tokens y fechas
 const genTokenHex = (bytes = 32) => crypto.randomBytes(bytes).toString("hex");
-const generarRefreshToken = (bytes = 48) => crypto.randomBytes(bytes).toString("hex");
-const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+const generarRefreshToken = (bytes = 48) =>
+  crypto.randomBytes(bytes).toString("hex");
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
 const fechaExpDias = (dias) => {
   const d = new Date();
   d.setDate(d.getDate() + Number(dias));
   return d;
 };
 
+// Cookies de refresh
 function setRefreshCookie(res, rawRefresh, dias) {
   res.cookie("refresh", rawRefresh, {
     httpOnly: true,
@@ -42,12 +54,13 @@ function setRefreshCookie(res, rawRefresh, dias) {
     maxAge: Number(dias) * 24 * 60 * 60 * 1000,
   });
 }
+
 function clearRefreshCookie(res) {
   res.clearCookie("refresh", { path: "/api/auth" });
 }
 
 // ————————————————————————————————————————————————
-// REGISTRO (sin autologin; requiere verificación por email)
+// REGISTRO (requiere verificación por email)
 // ————————————————————————————————————————————————
 export const registrar = async (req, res) => {
   try {
@@ -59,12 +72,14 @@ export const registrar = async (req, res) => {
     if (!nombre || !email || !password) {
       return res.status(400).json({ ok: false, mensaje: "Faltan campos" });
     }
+
     if (!emailValido(email)) {
       return res.status(422).json({ ok: false, mensaje: "Email no válido" });
     }
 
-    // ✅ Contraseña fuerte
-    const { ok: passOk, errores: passErrores } = validarPasswordFuerte(password);
+    // Validación de contraseña fuerte
+    const { ok: passOk, errores: passErrores } =
+      validarPasswordFuerte(password);
     if (!passOk) {
       return res.status(422).json({
         ok: false,
@@ -82,10 +97,12 @@ export const registrar = async (req, res) => {
 
     const existe = await Usuario.findOne({ email });
     if (existe) {
-      return res.status(409).json({ ok: false, mensaje: "El email ya está registrado" });
+      return res
+        .status(409)
+        .json({ ok: false, mensaje: "El email ya está registrado" });
     }
 
-    // Crear usuario y preparar verificación
+    // Creación de usuario y datos de verificación
     const usuario = new Usuario({ nombre, email });
     await usuario.setPassword(password);
 
@@ -94,9 +111,10 @@ export const registrar = async (req, res) => {
     usuario.verificationExpires = new Date(Date.now() + 24 * 3600 * 1000); // 24h
     await usuario.save();
 
-    // Enviar correo de verificación (no bloqueante)
+    // Envío de correo de verificación
     const baseFront = process.env.PUBLIC_URL || PUBLIC_URL;
     const link = `${baseFront}/verifica?token=${usuario.verificationToken}`;
+
     try {
       await enviarCorreo({
         to: email,
@@ -108,8 +126,8 @@ export const registrar = async (req, res) => {
         text: `Hola ${nombre}, confirma tu correo: ${link} (caduca en 24h)`,
       });
     } catch (e) {
-      console.error("⚠️ Error enviando email de verificación:", e.message);
-      // Devolvemos ok igualmente; el usuario puede pedir "reenviar verificación"
+      console.error("Error enviando email de verificación:", e.message);
+      // Se devuelve ok igualmente; el usuario puede solicitar un reenvío
     }
 
     return res.status(201).json({
@@ -118,8 +136,12 @@ export const registrar = async (req, res) => {
       email,
     });
   } catch (e) {
-    console.error("❌ registrar:", e);
-    return res.status(500).json({ ok: false, mensaje: "Error al registrar", detalle: e.message });
+    console.error("registrar:", e);
+    return res.status(500).json({
+      ok: false,
+      mensaje: "Error al registrar",
+      detalle: e.message,
+    });
   }
 };
 
@@ -134,10 +156,12 @@ export const iniciarSesion = async (req, res) => {
 
     const usuario = await Usuario.findOne({ email });
     if (!usuario) {
-      return res.status(401).json({ ok: false, mensaje: "Credenciales inválidas" });
+      return res
+        .status(401)
+            .json({ ok: false, mensaje: "Credenciales inválidas" });
     }
 
-    // 🔒 Si el usuario está marcado como eliminado -> no puede entrar
+    // Usuario marcado como eliminado
     if (usuario.eliminado) {
       return res.status(403).json({
         ok: false,
@@ -145,7 +169,7 @@ export const iniciarSesion = async (req, res) => {
       });
     }
 
-    // 🔒 Bloqueo manual o temporal
+    // Bloqueo manual o temporal
     if (typeof usuario.isLocked === "function" && usuario.isLocked()) {
       const msg = usuario.bloqueado
         ? "Tu cuenta está bloqueada por el administrador."
@@ -158,20 +182,28 @@ export const iniciarSesion = async (req, res) => {
       try {
         usuario.startLoginLockIfNeeded?.();
         await usuario.save();
-      } catch {}
-      return res.status(401).json({ ok: false, mensaje: "Credenciales inválidas" });
+      } catch {
+        // No se bloquea el flujo por errores en esta actualización
+      }
+      return res
+        .status(401)
+        .json({ ok: false, mensaje: "Credenciales inválidas" });
     }
 
-    // Exigir verificación antes de login
+    // Requiere correo verificado
     if (!usuario.emailVerified) {
-      return res.status(403).json({ ok: false, mensaje: "Email no verificado." });
+      return res
+        .status(403)
+        .json({ ok: false, mensaje: "Email no verificado." });
     }
 
-    // Resetear lock/contador si procede + registrar último login
+    // Reset de bloqueo, si aplica, y registro de último login
     if (usuario.failedLoginCount || usuario.lockUntil) {
       try {
         usuario.resetLoginLock?.();
-      } catch {}
+      } catch {
+        // Silencioso si la función no existe o falla
+      }
     }
     usuario.lastLoginAt = new Date();
     await usuario.save();
@@ -204,32 +236,44 @@ export const iniciarSesion = async (req, res) => {
       },
     });
   } catch (e) {
-    console.error("❌ iniciarSesion:", e);
-    res.status(500).json({ ok: false, mensaje: "Error al iniciar sesión", detalle: e.message });
+    console.error("iniciarSesion:", e);
+    res.status(500).json({
+      ok: false,
+      mensaje: "Error al iniciar sesión",
+      detalle: e.message,
+    });
   }
 };
 
 // ————————————————————————————————————————————————
-// REFRESH
+// REFRESH (nuevo JWT a partir del refresh cookie)
 // ————————————————————————————————————————————————
 export const refrescar = async (req, res) => {
   try {
     const raw = req.cookies?.refresh;
-    if (!raw) return res.status(401).json({ ok: false, mensaje: "Sin refresh" });
+    if (!raw) {
+      return res.status(401).json({ ok: false, mensaje: "Sin refresh" });
+    }
 
     const tokenHash = hashToken(raw);
     const sesion = await Sesion.findOne({ tokenHash, revoked: false });
+
     if (!sesion || sesion.expiresAt < new Date()) {
       return res.status(401).json({ ok: false, mensaje: "Refresh inválido" });
     }
 
     const usuario = await Usuario.findById(sesion.userId);
     if (!usuario) {
-      return res.status(401).json({ ok: false, mensaje: "Usuario no encontrado" });
+      return res
+        .status(401)
+        .json({ ok: false, mensaje: "Usuario no encontrado" });
     }
 
-    // 🔒 Si ahora está bloqueado o eliminado, no emitir nuevos tokens
-    if (usuario.eliminado || (typeof usuario.isLocked === "function" && usuario.isLocked())) {
+    // No renovar si la cuenta ahora está bloqueada o eliminada
+    if (
+      usuario.eliminado ||
+      (typeof usuario.isLocked === "function" && usuario.isLocked())
+    ) {
       return res.status(403).json({
         ok: false,
         mensaje: "La sesión ya no es válida. Vuelve a iniciar sesión.",
@@ -239,55 +283,76 @@ export const refrescar = async (req, res) => {
     const token = firmarJWT(usuario);
     res.json({ ok: true, token });
   } catch (e) {
-    console.error("❌ refrescar:", e);
-    res.status(500).json({ ok: false, mensaje: "Error al refrescar", detalle: e.message });
+    console.error("refrescar:", e);
+    res.status(500).json({
+      ok: false,
+      mensaje: "Error al refrescar",
+      detalle: e.message,
+    });
   }
 };
 
 // ————————————————————————————————————————————————
-// LOGOUT Y LOGOUT-ALL
+// LOGOUT (solo la sesión actual) y LOGOUT-ALL
 // ————————————————————————————————————————————————
 export const cerrarSesion = async (req, res) => {
   try {
     const raw = req.cookies?.refresh;
     if (raw) {
       const tokenHash = hashToken(raw);
-      await Sesion.updateOne({ tokenHash }, { $set: { revoked: true } });
+      await Sesion.updateOne(
+        { tokenHash },
+        { $set: { revoked: true } }
+      );
     }
     clearRefreshCookie(res);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ ok: false, mensaje: "Error al cerrar sesión" });
+    res
+      .status(500)
+      .json({ ok: false, mensaje: "Error al cerrar sesión" });
   }
 };
 
 export const cerrarSesiones = async (req, res) => {
   try {
     const userId = req.usuario?.id || req.usuario?._id || req.usuario?.sub;
-    if (!userId) return res.status(401).json({ ok: false, mensaje: "No autorizado" });
+    if (!userId) {
+      return res.status(401).json({ ok: false, mensaje: "No autorizado" });
+    }
 
-    await Sesion.updateMany({ userId }, { $set: { revoked: true } });
+    await Sesion.updateMany(
+      { userId },
+      { $set: { revoked: true } }
+    );
     clearRefreshCookie(res);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ ok: false, mensaje: "Error al cerrar todas las sesiones" });
+    res.status(500).json({
+      ok: false,
+      mensaje: "Error al cerrar todas las sesiones",
+    });
   }
 };
 
 // ————————————————————————————————————————————————
-// PERFIL
+// PERFIL (datos del usuario autenticado)
 // ————————————————————————————————————————————————
 export const perfil = (req, res) => {
   res.json({ ok: true, usuario: req.usuario });
 };
 
 // ————————————————————————————————————————————————
-// VERIFICAR / REENVIAR / OLVIDÉ / RESET
+// VERIFICAR EMAIL / REENVIAR VERIFICACIÓN
 // ————————————————————————————————————————————————
 export const verificarEmail = async (req, res) => {
   try {
     const token = (req.query?.token || "").trim();
-    if (!token) return res.status(400).json({ ok: false, mensaje: "Token requerido" });
+    if (!token) {
+      return res
+        .status(400)
+        .json({ ok: false, mensaje: "Token requerido" });
+    }
 
     const user = await Usuario.findOne({
       verificationToken: token,
@@ -295,7 +360,10 @@ export const verificarEmail = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ ok: false, mensaje: "Token inválido o caducado" });
+      return res.status(400).json({
+        ok: false,
+        mensaje: "Token inválido o caducado",
+      });
     }
 
     user.emailVerified = true;
@@ -305,19 +373,31 @@ export const verificarEmail = async (req, res) => {
 
     res.json({ ok: true, mensaje: "Email verificado" });
   } catch (e) {
-    console.error("❌ verificarEmail:", e);
-    res.status(500).json({ ok: false, mensaje: "Error al verificar" });
+    console.error("verificarEmail:", e);
+    res
+      .status(500)
+      .json({ ok: false, mensaje: "Error al verificar" });
   }
 };
 
 export const reenviarVerificacion = async (req, res) => {
   try {
     const email = (req.body?.email || "").trim().toLowerCase();
-    if (!emailValido(email)) return res.status(422).json({ ok: false, mensaje: "Email no válido" });
+    if (!emailValido(email)) {
+      return res
+        .status(422)
+        .json({ ok: false, mensaje: "Email no válido" });
+    }
 
     const user = await Usuario.findOne({ email });
-    if (!user) return res.status(404).json({ ok: false, mensaje: "No existe usuario con ese email" });
-    if (user.emailVerified) return res.json({ ok: true, mensaje: "Ya estaba verificado" });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ ok: false, mensaje: "No existe usuario con ese email" });
+    }
+    if (user.emailVerified) {
+      return res.json({ ok: true, mensaje: "Ya estaba verificado" });
+    }
 
     user.verificationToken = genTokenHex(32);
     user.verificationExpires = new Date(Date.now() + 24 * 3600 * 1000);
@@ -335,17 +415,28 @@ export const reenviarVerificacion = async (req, res) => {
 
     res.json({ ok: true, mensaje: "Correo de verificación reenviado" });
   } catch (e) {
-    console.error("❌ reenviarVerificacion:", e);
-    res.status(500).json({ ok: false, mensaje: "Error al reenviar verificación" });
+    console.error("reenviarVerificacion:", e);
+    res.status(500).json({
+      ok: false,
+      mensaje: "Error al reenviar verificación",
+    });
   }
 };
 
+// ————————————————————————————————————————————————
+// OLVIDÉ PASSWORD / RESET PASSWORD
+// ————————————————————————————————————————————————
 export const olvidePassword = async (req, res) => {
   try {
     const email = (req.body?.email || "").trim().toLowerCase();
-    if (!emailValido(email)) return res.status(422).json({ ok: false, mensaje: "Email no válido" });
+    if (!emailValido(email)) {
+      return res
+        .status(422)
+        .json({ ok: false, mensaje: "Email no válido" });
+    }
 
     const user = await Usuario.findOne({ email });
+
     if (user) {
       user.resetToken = genTokenHex(32);
       user.resetExpires = new Date(Date.now() + 3600 * 1000); // 1h
@@ -361,25 +452,37 @@ export const olvidePassword = async (req, res) => {
         text: `Restablece tu contraseña: ${link} (caduca en 1h)`,
       });
     }
-    // No revelar si existe o no el email
+
+    // No se indica si el email existe o no en la base de datos
     res.json({ ok: true });
   } catch (e) {
-    console.error("❌ olvidePassword:", e);
-    res.status(500).json({ ok: false, mensaje: "Error al enviar enlace" });
+    console.error("olvidePassword:", e);
+    res.status(500).json({
+      ok: false,
+      mensaje: "Error al enviar enlace",
+    });
   }
 };
 
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body || {};
-    if (!token) return res.status(400).json({ ok: false, mensaje: "Token requerido" });
+    if (!token) {
+      return res
+        .status(400)
+        .json({ ok: false, mensaje: "Token requerido" });
+    }
 
-    // ✅ Contraseña fuerte en reset
-    const { ok: passOkReset, errores: passErrReset } = validarPasswordFuerte(newPassword || "");
+    // Validación de contraseña fuerte en el cambio
+    const {
+      ok: passOkReset,
+      errores: passErrReset,
+    } = validarPasswordFuerte(newPassword || "");
     if (!passOkReset) {
       return res.status(422).json({
         ok: false,
-        mensaje: "La nueva contraseña no cumple los requisitos de seguridad.",
+        mensaje:
+          "La nueva contraseña no cumple los requisitos de seguridad.",
         detalles: passErrReset,
       });
     }
@@ -390,7 +493,10 @@ export const resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ ok: false, mensaje: "Token inválido o caducado" });
+      return res.status(400).json({
+        ok: false,
+        mensaje: "Token inválido o caducado",
+      });
     }
 
     await user.setPassword(newPassword);
@@ -400,7 +506,10 @@ export const resetPassword = async (req, res) => {
 
     res.json({ ok: true, mensaje: "Contraseña actualizada" });
   } catch (e) {
-    console.error("❌ resetPassword:", e);
-    res.status(500).json({ ok: false, mensaje: "Error al restablecer contraseña" });
+    console.error("resetPassword:", e);
+    res.status(500).json({
+      ok: false,
+      mensaje: "Error al restablecer contraseña",
+    });
   }
 };

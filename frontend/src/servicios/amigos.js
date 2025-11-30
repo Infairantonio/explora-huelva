@@ -1,14 +1,20 @@
+// src/servicios/amigos.js
+// Servicio para gestionar solicitudes y amistades entre usuarios.
+
 import { API_URL, getToken } from './api';
 
+// Cabecera con token si está disponible
 const auth = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+// Manejo estándar de respuestas de la API
 async function handle(res) {
   const ct = res.headers.get('content-type') || '';
   const isJson = ct.includes('application/json');
   const data = isJson ? await res.json().catch(() => ({})) : await res.text();
+
   if (!res.ok) {
     const msg = (isJson && data?.mensaje) || res.statusText || 'Error de red';
     const err = new Error(msg);
@@ -16,9 +22,11 @@ async function handle(res) {
     err.payload = data;
     throw err;
   }
+
   return data;
 }
 
+// Construcción de querystring limpia
 const qs = (obj = {}) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
@@ -30,28 +38,34 @@ const qs = (obj = {}) => {
 };
 
 export const amigosApi = {
-  // Buscar usuarios para enviar solicitud
+  // Buscar usuarios para enviar solicitud de amistad
   async buscarUsuarios(q, { page = 1, limit = 20 } = {}) {
-    const r = await fetch(`${API_URL}/amigos/buscar-usuarios${qs({ q, page, limit })}`, {
+    const r = await fetch(
+      `${API_URL}/amigos/buscar-usuarios${qs({ q, page, limit })}`,
+      { headers: { ...auth() }, cache: 'no-store' }
+    );
+    return handle(r);
+  },
+
+  // Listar amigos actuales
+  async listar() {
+    const r = await fetch(`${API_URL}/amigos`, {
       headers: { ...auth() },
       cache: 'no-store',
     });
     return handle(r);
   },
 
-  // Listar amigos
-  async listar() {
-    const r = await fetch(`${API_URL}/amigos`, { headers: { ...auth() }, cache: 'no-store' });
-    return handle(r);
-  },
-
-  // Listar pendientes (recibidas y enviadas juntas en .items con {tipo, usuario})
+  // Solicitudes pendientes (recibidas y enviadas)
   async pendientes() {
-    const r = await fetch(`${API_URL}/amigos/pendientes`, { headers: { ...auth() }, cache: 'no-store' });
+    const r = await fetch(`${API_URL}/amigos/pendientes`, {
+      headers: { ...auth() },
+      cache: 'no-store',
+    });
     return handle(r);
   },
 
-  // Enviar solicitud (por ID de usuario)
+  // Enviar solicitud por ID de usuario
   async solicitarPorId(usuarioId) {
     const r = await fetch(`${API_URL}/amigos/solicitar`, {
       method: 'POST',
@@ -61,7 +75,7 @@ export const amigosApi = {
     return handle(r);
   },
 
-  // Cancelar una solicitud que YO envié
+  // Cancelar solicitud enviada
   async cancelar(usuarioId) {
     const r = await fetch(`${API_URL}/amigos/cancelar`, {
       method: 'POST',
@@ -71,7 +85,7 @@ export const amigosApi = {
     return handle(r);
   },
 
-  // Aceptar / Rechazar solicitud recibida
+  // Aceptar o rechazar solicitud recibida
   async aceptar(usuarioId) {
     const r = await fetch(`${API_URL}/amigos/aceptar`, {
       method: 'POST',
@@ -80,6 +94,7 @@ export const amigosApi = {
     });
     return handle(r);
   },
+
   async rechazar(usuarioId) {
     const r = await fetch(`${API_URL}/amigos/rechazar`, {
       method: 'POST',
@@ -89,7 +104,7 @@ export const amigosApi = {
     return handle(r);
   },
 
-  // Eliminar amistad (ya aceptada)
+  // Eliminar una amistad ya aceptada
   async eliminar(usuarioId) {
     const r = await fetch(`${API_URL}/amigos/${usuarioId}`, {
       method: 'DELETE',

@@ -2,17 +2,15 @@
 // ————————————————————————————————————————————————————
 // Rutas de comentarios.
 // - GET    /api/tarjetas/:id/comentarios
-//      -> listar
-//         * público para tarjetas "publico"
-//         * requiere usuario con acceso para "amigos"/"privado"
+//      → listar (público si la tarjeta es “publico”)
+//        * Para “amigos” o “privado”: requiere usuario con acceso
 // - POST   /api/tarjetas/:id/comentarios
-//      -> crear (requiere auth)
+//      → crear (requiere auth + acceso permitido)
 // - DELETE /api/comentarios/:id
-//      -> borrar (autor o dueño de la tarjeta)
+//      → eliminar (solo autor o dueño de la tarjeta)
 // ————————————————————————————————————————————————————
 
 import { Router } from 'express';
-// 👇 mantenemos la auth normal y añadimos la opcional
 import autenticacion, {
   autenticacionOpcional,
 } from '../middleware/autenticacion.js';
@@ -21,32 +19,38 @@ import * as comentarios from '../controladores/comentarios.controlador.js';
 const router = Router();
 
 /**
- * Listar comentarios de una tarjeta.
+ * GET /api/tarjetas/:id/comentarios
+ * 
+ * - Tarjetas "publico": cualquiera puede listar comentarios.
+ *   * Si el usuario envía Authorization, autenticacionOpcional
+ *     añadirá req.usuario para que el backend pueda aplicar reglas.
  *
- * - Para tarjetas "publico": cualquiera puede verlos.
- *   Si viene token en Authorization, autenticacionOpcional
- *   rellenará req.usuario, y el backend sabrá quién eres.
- *
- * - Para tarjetas "amigos" o "privado":
- *   el controlador comprobará si req.usuario tiene acceso.
+ * - Tarjetas "amigos" o "privado":
+ *   * El controlador valida si req.usuario tiene permiso de acceso.
  */
 router.get(
   '/tarjetas/:id/comentarios',
-  autenticacionOpcional,    // ⬅️ clave: auth opcional
+  autenticacionOpcional, // autenticación no obligatoria
   comentarios.listar
 );
 
-// Crear comentario (usuario autenticado, con acceso a la tarjeta)
+/**
+ * POST /api/tarjetas/:id/comentarios
+ * Crear comentario → requiere usuario autenticado
+ */
 router.post(
   '/tarjetas/:id/comentarios',
-  autenticacion,            // auth obligatoria
+  autenticacion, // obligatoría
   comentarios.crear
 );
 
-// Eliminar comentario (autor del comentario o dueño de la tarjeta)
+/**
+ * DELETE /api/comentarios/:id
+ * Eliminar comentario → solo autor o dueño de la tarjeta
+ */
 router.delete(
   '/comentarios/:id',
-  autenticacion,            // auth obligatoria
+  autenticacion, // obligatoria
   comentarios.eliminar
 );
 

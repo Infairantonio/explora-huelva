@@ -1,7 +1,14 @@
 // backend/src/rutas/auth.ruta.js
 // ————————————————————————————————————————————————————
-// Rutas de autenticación: registro, login, refresh, verificación y reset.
+// Rutas de autenticación:
+//  - Registro
+//  - Login
+//  - Refresh de token
+//  - Logout (una sesión y todas)
+//  - Perfil
+//  - Verificación de email y recuperación de contraseña
 // ————————————————————————————————————————————————————
+
 import { Router } from "express";
 import { body, query, validationResult } from "express-validator";
 import {
@@ -16,12 +23,11 @@ import {
   olvidePassword,
   resetPassword,
 } from "../controladores/auth.controlador.js";
-// ⬅️ asegúrate de que el archivo está en "middlewares"
 import autenticacion from "../middleware/autenticacion.js";
 
 const router = Router();
 
-// Validación genérica
+// Validación genérica de express-validator
 const validar = (req, res, next) => {
   const errores = validationResult(req);
   if (!errores.isEmpty()) {
@@ -30,43 +36,81 @@ const validar = (req, res, next) => {
   next();
 };
 
-// Reglas
-const toTrimLower = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
+// Sanitizador sencillo para emails
+const toTrimLower = (v) =>
+  typeof v === "string" ? v.trim().toLowerCase() : v;
 
+// Reglas de validación
 const reglaNombre = body("nombre")
-  .isString().withMessage("Nombre inválido")
+  .isString()
+  .withMessage("Nombre inválido")
   .trim()
-  .isLength({ min: 2, max: 80 }).withMessage("El nombre debe tener 2-80 caracteres");
+  .isLength({ min: 2, max: 80 })
+  .withMessage("El nombre debe tener entre 2 y 80 caracteres");
 
 const reglaEmail = body("email")
   .customSanitizer(toTrimLower)
-  .isEmail().withMessage("Email no válido");
+  .isEmail()
+  .withMessage("Email no válido");
 
-// ✅ Endurecida: contraseña fuerte en registro
+// Contraseña fuerte en registro
 const reglaPasswordRegistro = body("password")
-  .isLength({ min: 10 }).withMessage("La contraseña debe tener al menos 10 caracteres")
-  .matches(/[a-z]/).withMessage("Debe incluir una minúscula")
-  .matches(/[A-Z]/).withMessage("Debe incluir una mayúscula")
-  .matches(/[0-9]/).withMessage("Debe incluir un número")
-  .matches(/[^A-Za-z0-9]/).withMessage("Debe incluir un símbolo");
+  .isLength({ min: 10 })
+  .withMessage("La contraseña debe tener al menos 10 caracteres")
+  .matches(/[a-z]/)
+  .withMessage("Debe incluir una minúscula")
+  .matches(/[A-Z]/)
+  .withMessage("Debe incluir una mayúscula")
+  .matches(/[0-9]/)
+  .withMessage("Debe incluir un número")
+  .matches(/[^A-Za-z0-9]/)
+  .withMessage("Debe incluir un símbolo");
 
 const reglaPasswordLogin = body("password")
-  .isLength({ min: 1 }).withMessage("La contraseña es obligatoria");
+  .isLength({ min: 1 })
+  .withMessage("La contraseña es obligatoria");
 
 const reglaRemember = body("remember")
   .optional()
-  .isBoolean().withMessage("remember debe ser booleano")
+  .isBoolean()
+  .withMessage("remember debe ser booleano")
   .toBoolean();
 
-// ——— Endpoints principales ———
-router.post("/registrar", [reglaNombre, reglaEmail, reglaPasswordRegistro, validar], registrar);
-router.post("/login", [reglaEmail, reglaPasswordLogin, reglaRemember, validar], iniciarSesion);
+// ————————————————————————————————————————————————————
+// Endpoints principales
+// ————————————————————————————————————————————————————
+
+// Registro (requiere nombre, email y contraseña fuerte)
+router.post(
+  "/registrar",
+  [reglaNombre, reglaEmail, reglaPasswordRegistro, validar],
+  registrar
+);
+
+// Login con opción "recuérdame" (refresh más largo)
+router.post(
+  "/login",
+  [reglaEmail, reglaPasswordLogin, reglaRemember, validar],
+  iniciarSesion
+);
+
+// Obtener nuevo access token a partir del refresh cookie httpOnly
 router.post("/refresh", refrescar);
+
+// Cerrar solo la sesión actual (revoca refresh de esta cookie)
 router.post("/logout", cerrarSesion);
+
+// Cerrar todas las sesiones del usuario (requiere estar logueado)
 router.post("/logout-all", autenticacion, cerrarSesiones);
+
+// Datos básicos del usuario autenticado
 router.get("/perfil", autenticacion, perfil);
 
-// ——— Verificación y recuperación ———
+// ————————————————————————————————————————————————————
+// Verificación de email y recuperación de contraseña
+// ————————————————————————————————————————————————————
+
+// Verificar email a partir de enlace con token
 router.get(
   "/verificar-email",
   [query("token").isString().isLength({ min: 10 }).withMessage("Token inválido")],
@@ -74,21 +118,28 @@ router.get(
   verificarEmail
 );
 
+// Reenviar correo de verificación
 router.post("/reenviar-verificacion", [reglaEmail, validar], reenviarVerificacion);
 
+// Enviar enlace de "he olvidado mi contraseña"
 router.post("/olvide", [reglaEmail, validar], olvidePassword);
 
-// ✅ Endurecida: contraseña fuerte en reset
+// Reset de contraseña (con token y contraseña fuerte)
 router.post(
   "/reset",
   [
     body("token").isString().isLength({ min: 10 }),
     body("newPassword")
-      .isLength({ min: 10 }).withMessage("La contraseña debe tener al menos 10 caracteres")
-      .matches(/[a-z]/).withMessage("Debe incluir una minúscula")
-      .matches(/[A-Z]/).withMessage("Debe incluir una mayúscula")
-      .matches(/[0-9]/).withMessage("Debe incluir un número")
-      .matches(/[^A-Za-z0-9]/).withMessage("Debe incluir un símbolo"),
+      .isLength({ min: 10 })
+      .withMessage("La contraseña debe tener al menos 10 caracteres")
+      .matches(/[a-z]/)
+      .withMessage("Debe incluir una minúscula")
+      .matches(/[A-Z]/)
+      .withMessage("Debe incluir una mayúscula")
+      .matches(/[0-9]/)
+      .withMessage("Debe incluir un número")
+      .matches(/[^A-Za-z0-9]/)
+      .withMessage("Debe incluir un símbolo"),
     validar,
   ],
   resetPassword

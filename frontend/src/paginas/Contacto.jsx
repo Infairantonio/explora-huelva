@@ -1,4 +1,6 @@
 // src/paginas/Contacto.jsx
+// Página de contacto con datos directos y formulario conectado al backend.
+
 import { useState } from "react";
 import { API_URL } from "../servicios/api";
 
@@ -11,6 +13,7 @@ export default function Contacto() {
   const [okMsg, setOkMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
 
+  // Envía el formulario al backend
   const enviar = async (e) => {
     e.preventDefault();
     setOkMsg("");
@@ -22,12 +25,11 @@ export default function Contacto() {
     }
 
     setEnviando(true);
+
     try {
       const res = await fetch(`${API_URL}/contacto`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: nombre.trim(),
           email: email.trim(),
@@ -37,8 +39,7 @@ export default function Contacto() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const msg = data?.mensaje || "No se pudo enviar el mensaje.";
-        throw new Error(msg);
+        throw new Error(data?.mensaje || "No se pudo enviar el mensaje.");
       }
 
       setOkMsg("Mensaje enviado correctamente. ¡Gracias por escribir! 😊");
@@ -56,21 +57,21 @@ export default function Contacto() {
     <main className="container py-4" role="main">
       <div className="row justify-content-center">
         <div className="col-12 col-lg-10">
-          {/* Cabecera */}
+          {/* Cabecera de la página */}
           <header className="mb-4">
             <h1 className="h3 fw-bold mb-2">Contacto</h1>
             <p className="text-muted mb-0">
-              Si tienes dudas, propuestas de rutas o ideas para Explora Huelva,
-              puedes escribirnos por este formulario o por los medios de contacto.
+              Si tienes dudas, propuestas o ideas para Explora Huelva,
+              puedes escribirnos por aquí.
             </p>
           </header>
 
           <div className="row g-4">
-            {/* Datos de contacto directos */}
+            {/* Información de contacto directa */}
             <section className="col-12 col-md-5">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body">
-                  <h2 className="h5 mb-3">Cómo puedes encontrarnos</h2>
+                  <h2 className="h5 mb-3">Cómo encontrarnos</h2>
 
                   <ul className="list-unstyled mb-3">
                     <li className="mb-3 d-flex align-items-start gap-2">
@@ -124,21 +125,17 @@ export default function Contacto() {
               </div>
             </section>
 
-            {/* Formulario de contacto REAL (via backend) */}
+            {/* Formulario de contacto */}
             <section className="col-12 col-md-7">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body">
                   <h2 className="h5 mb-3">Escríbenos un mensaje</h2>
                   <p className="text-muted">
-                    Tu mensaje se enviará a nuestro correo de contacto.
+                    Este mensaje se enviará directamente a nuestro correo.
                   </p>
 
-                  {okMsg && (
-                    <div className="alert alert-success py-2">{okMsg}</div>
-                  )}
-                  {errMsg && (
-                    <div className="alert alert-danger py-2">{errMsg}</div>
-                  )}
+                  {okMsg && <div className="alert alert-success py-2">{okMsg}</div>}
+                  {errMsg && <div className="alert alert-danger py-2">{errMsg}</div>}
 
                   <form onSubmit={enviar} noValidate>
                     <div className="mb-3">
@@ -151,7 +148,6 @@ export default function Contacto() {
                         className="form-control"
                         value={nombre}
                         onChange={(e) => setNombre(e.target.value)}
-                        required
                         disabled={enviando}
                       />
                     </div>
@@ -166,7 +162,6 @@ export default function Contacto() {
                         className="form-control"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        required
                         disabled={enviando}
                       />
                     </div>
@@ -181,7 +176,6 @@ export default function Contacto() {
                         rows={4}
                         value={mensaje}
                         onChange={(e) => setMensaje(e.target.value)}
-                        required
                         disabled={enviando}
                       />
                     </div>

@@ -1,18 +1,20 @@
 // src/servicios/adminTarjetas.js
-// API de administración para TARJETAS (rutas /api/admin/tarjetas)
+// Servicio para gestionar tarjetas desde el panel de administración.
 
 import { API_URL, getToken } from "./api";
 
-// Igual que en tarjetas.js
+// Cabecera con token si está disponible
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+// Manejo estándar de respuestas de la API
 async function handle(res) {
   const ct = res.headers.get("content-type") || "";
   const isJson = ct.includes("application/json");
   const data = isJson ? await res.json().catch(() => ({})) : await res.text();
+
   if (!res.ok) {
     const msg = (isJson && data?.mensaje) || res.statusText || "Error de red";
     const err = new Error(msg);
@@ -20,9 +22,11 @@ async function handle(res) {
     err.payload = data;
     throw err;
   }
+
   return data;
 }
 
+// Construcción de querystring limpia
 const qs = (obj = {}) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
@@ -34,7 +38,7 @@ const qs = (obj = {}) => {
 };
 
 export const adminTarjetasApi = {
-  // GET /api/admin/tarjetas
+  // Listado de tarjetas
   async listar(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas${qs(params)}`, {
       ...options,
@@ -44,7 +48,7 @@ export const adminTarjetasApi = {
     return handle(r);
   },
 
-  // GET /api/admin/tarjetas/:id
+  // Detalle de una tarjeta
   async detalle(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
       ...options,
@@ -54,7 +58,7 @@ export const adminTarjetasApi = {
     return handle(r);
   },
 
-  // DELETE /api/admin/tarjetas/:id  (soft delete)
+  // Eliminación (soft delete)
   async eliminar(id, motivo = "", options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}`, {
       method: "DELETE",
@@ -69,7 +73,7 @@ export const adminTarjetasApi = {
     return handle(r);
   },
 
-  // POST /api/admin/tarjetas/:id/restaurar
+  // Restaurar tarjeta borrada
   async restaurar(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/tarjetas/${id}/restaurar`, {
       method: "POST",

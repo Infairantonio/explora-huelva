@@ -1,12 +1,10 @@
-// src/paginas/Ayuda.jsx
-// Página sencilla de ayuda / preguntas frecuentes para Explora Huelva
+// src/paginas/Ayuda.jsx · Página de ayuda y preguntas frecuentes de Explora Huelva
 
 import { Link } from "react-router-dom";
 
 export default function Ayuda() {
   return (
     <main className="container py-4">
-      {/* Cabecera */}
       <header className="mb-4">
         <h1 className="h4 fw-bold mb-1">
           <i className="bi bi-question-circle me-2" />
@@ -17,7 +15,7 @@ export default function Ayuda() {
         </p>
       </header>
 
-      {/* Bloque 1: Empezar a usar Explora Huelva */}
+      {/* Primeros pasos en la plataforma */}
       <section className="mb-4">
         <h2 className="h5 fw-bold mb-3">Primeros pasos</h2>
         <div className="card border-0 shadow-sm">
@@ -44,7 +42,7 @@ export default function Ayuda() {
         </div>
       </section>
 
-      {/* Bloque 2: Mi panel y favoritos */}
+      {/* Información sobre panel y favoritos */}
       <section className="mb-4">
         <h2 className="h5 fw-bold mb-3">Mi panel y favoritos</h2>
         <div className="card border-0 shadow-sm">
@@ -72,7 +70,7 @@ export default function Ayuda() {
         </div>
       </section>
 
-      {/* Bloque 3: Problemas frecuentes */}
+      {/* Incidencias habituales de uso */}
       <section className="mb-4">
         <h2 className="h5 fw-bold mb-3">Problemas frecuentes</h2>
         <div className="card border-0 shadow-sm">
@@ -100,7 +98,7 @@ export default function Ayuda() {
         </div>
       </section>
 
-      {/* Bloque 4: Contacto directo */}
+      {/* Derivamos a la página de contacto para dudas adicionales */}
       <section className="mb-4">
         <h2 className="h5 fw-bold mb-3">¿Sigues con dudas?</h2>
         <div className="alert alert-secondary-subtle border">

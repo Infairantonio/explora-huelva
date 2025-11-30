@@ -1,18 +1,20 @@
 // backend/src/middleware/autenticacion.js
 // ————————————————————————————————————————————————
-// Middleware de autenticación por JWT.
-// Extrae "Authorization: Bearer <token>", verifica (utils/jwt)
-// y añade req.usuario con id, nombre, email y rol.
+// Middleware de autenticación JWT.
+//   - Lee "Authorization: Bearer <token>"
+//   - Verifica el token (utils/jwt)
+//   - Rellena req.usuario { id, nombre, email, rol }
+// Versión opcional: deja pasar sin token pero, si lo hay, lo valida.
 // ————————————————————————————————————————————————
 
 import { verificar } from '../utils/jwt.js';
 
 export default function autenticacion(req, res, next) {
-  // Leer cabecera Authorization (tolerante a mayúsculas/minúsculas)
+  // Cabecera Authorization (acepta mayúsculas/minúsculas)
   const rawAuth = req.headers.authorization ?? req.headers.Authorization ?? '';
   const auth = typeof rawAuth === 'string' ? rawAuth.trim() : '';
 
-  // Acepta "Bearer <token>" con prefijo case-insensitive y espacios variables
+  // Formato esperado: "Bearer <token>"
   const match = auth.match(/^Bearer\s+(.+)$/i);
   const token = match?.[1]?.trim();
 
@@ -23,10 +25,10 @@ export default function autenticacion(req, res, next) {
   }
 
   try {
-    // verificar() ya usa el secreto del entorno y puede aplicar clockTolerance
+    // verificar() usa la clave y opciones definidas en utils/jwt
     const payload = verificar(token);
 
-    // Estructura que usan los middlewares/rutas aguas abajo (req.usuario.id, etc.)
+    // Estructura estándar para el resto de la aplicación
     req.usuario = {
       id: payload.uid,
       nombre: payload.nombre,
@@ -44,18 +46,19 @@ export default function autenticacion(req, res, next) {
 
 /**
  * autenticacionOpcional:
- * - Si NO hay cabecera Authorization → deja pasar como anónimo (sin req.usuario).
- * - Si SÍ hay cabecera → reutiliza el middleware autenticacion normal.
+ *  - Sin cabecera Authorization → continúa como anónimo (sin req.usuario).
+ *  - Con cabecera Authorization → reutiliza autenticacion normal.
  */
 export function autenticacionOpcional(req, res, next) {
   const rawAuth = req.headers.authorization ?? req.headers.Authorization ?? '';
   const auth = typeof rawAuth === 'string' ? rawAuth.trim() : '';
 
   if (!auth) {
-    // sin token: seguimos sin tocar nada, req.usuario queda undefined
+    // Sin token: no se toca req.usuario
     return next();
   }
 
-  // hay Authorization → validamos como siempre
+  // Con token: se valida igual que en autenticacion
   return autenticacion(req, res, next);
 }
+

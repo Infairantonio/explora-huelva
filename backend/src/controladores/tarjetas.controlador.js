@@ -4,7 +4,7 @@
 // subida de media y listados paginados.
 // Soporta visibilidades: 'publico' | 'privado' | 'amigos'.
 // Incluye detalle público: publicaUna (GET /api/tarjetas/publicas/:id)
-// Y listado de amigos: amigos (GET /api/tarjetas/amigos)
+// y listado de amigos: amigos (GET /api/tarjetas/amigos).
 // ————————————————————————————————————————————————————————
 
 import { validationResult } from 'express-validator';
@@ -17,11 +17,10 @@ import fs from 'fs/promises';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
-
 // ---------- helpers ----------
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// Única fuente local para filtrar entrada (en modelo también existe)
+// Única fuente local para filtrar entrada (coherente con el modelo)
 const ETIQUETAS_PERMITIDAS = ['lugares', 'experiencias', 'rutas'];
 
 const uniq = (arr) => [...new Set(arr)];
@@ -57,7 +56,7 @@ function baseUploads(req) {
   return `${proto}://${host}/uploads`;
 }
 
-// A partir de req.files (multer.fields), genera URLs públicas (se usan SOLO para guardado actual)
+// A partir de req.files (multer.fields), genera URLs públicas
 function extraerMediaDesdeFiles(req) {
   const base = baseUploads(req);
   const imagenesSubidas = (req.files?.imagenes || []).map((f) => `${base}/${f.filename}`);
@@ -122,7 +121,7 @@ const mapVideo = (v) => {
   if (String(v).startsWith('/uploads/')) return `/api${v}`;
   // si es absoluta y contiene /uploads/, usa basename
   if (/\/uploads\//i.test(String(v))) return toPublicUrl(v);
-  // si no parece de /uploads, la dejamos tal cual (p.ej. YouTube)
+  // si no parece de /uploads, se deja tal cual (p.ej. YouTube)
   return v;
 };
 
@@ -130,7 +129,7 @@ const mapVideo = (v) => {
 const serializeTarjeta = (doc) => {
   const o = doc?.toObject ? doc.toObject() : { ...doc };
   o.imagenes = mapImagenes(o.imagenes);
-  if (o.imagen) o.imagen = toPublicUrl(o.imagen);        // legacy
+  if (o.imagen) o.imagen = toPublicUrl(o.imagen);          // legacy
   if (o.imagenUrl) o.imagenUrl = toPublicUrl(o.imagenUrl); // legacy
   if (o.videoUrl) o.videoUrl = mapVideo(o.videoUrl);
   return o;
@@ -155,7 +154,7 @@ async function sonAmigos(userIdA, userIdB) {
 // ---------- Crear ----------
 export async function crear(req, res) {
   try {
-    // Red de seguridad: por si cambian middlewares en la ruta
+    // Validaciones definidas en la ruta (express-validator)
     const errores = validationResult(req);
     if (!errores.isEmpty()) {
       return res.status(422).json({ ok: false, errores: errores.array() });
@@ -175,7 +174,7 @@ export async function crear(req, res) {
 
     const { imagenesSubidas, videoUrlSubido } = extraerMediaDesdeFiles(req);
 
-    // Lat/Lng: opcionales; si vienen ambos, se guardan; si no, se omiten.
+    // Lat/Lng opcionales; solo se guardan si llegan las dos
     const lat = parseNum(latRaw);
     const lng = parseNum(lngRaw);
     const incluirUbicacion = lat != null && lng != null;
@@ -195,13 +194,17 @@ export async function crear(req, res) {
       ...(incluirUbicacion ? { lat, lng } : {}),
     });
 
-    // ⇣⇣ respuesta con URLs públicas normalizadas
+    // Respuesta con URLs públicas normalizadas
     return res.status(201).json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
     if (e?.name === 'ValidationError') {
-      return res.status(422).json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
+      return res
+        .status(422)
+        .json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
     }
-    return res.status(500).json({ ok: false, mensaje: 'Error creando tarjeta', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error creando tarjeta', error: e.message });
   }
 }
 
@@ -217,7 +220,7 @@ export async function mias(req, res) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        // NUEVO: traemos también el usuario con su nombre (para mostrar "creado por")
+        // Incluye datos básicos del usuario creador
         .populate({
           path: 'usuario',
           select: 'nombre _id',
@@ -234,7 +237,9 @@ export async function mias(req, res) {
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, mensaje: 'Error listando tarjetas', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error listando tarjetas', error: e.message });
   }
 }
 
@@ -258,7 +263,7 @@ export async function publicas(req, res) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        // NUEVO: incluimos el usuario con su nombre para las tarjetas públicas
+        // Incluye datos básicos del usuario creador en tarjetas públicas
         .populate({
           path: 'usuario',
           select: 'nombre _id',
@@ -275,13 +280,15 @@ export async function publicas(req, res) {
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, mensaje: 'Error listando públicas', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error listando públicas', error: e.message });
   }
 }
 
 /* ---------- Listar tarjetas de AMIGOS (requiere token) ----------
-   Devuelve tarjetas con visibilidad 'amigos' de usuarios que
-   tienen amistad aceptada con el usuario autenticado.
+   Devuelve tarjetas con visibilidad 'amigos' de usuarios
+   con amistad aceptada con el usuario autenticado.
 */
 export async function amigos(req, res) {
   try {
@@ -289,7 +296,7 @@ export async function amigos(req, res) {
     const limit = parseLimit(req.query.limit, 12, 1, 50);
     const uid = req.usuario.id;
 
-    // Obtener IDs de amigos (estado aceptada)
+    // IDs de amigos (estado aceptada)
     const relaciones = await Amigo.find({
       estado: 'aceptada',
       $or: [{ solicitante: uid }, { receptor: uid }],
@@ -324,7 +331,7 @@ export async function amigos(req, res) {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        // NUEVO: traemos nombre del usuario creador también en las tarjetas de amigos
+        // Incluye datos básicos del usuario creador en tarjetas de amigos
         .populate({
           path: 'usuario',
           select: 'nombre _id',
@@ -341,7 +348,9 @@ export async function amigos(req, res) {
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, mensaje: 'Error listando amigos', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error listando amigos', error: e.message });
   }
 }
 
@@ -354,21 +363,23 @@ export async function publicaUna(req, res) {
     }
 
     const doc = await Tarjeta.findById(id)
-      // NUEVO: incluimos el usuario (con nombre) en el detalle público
+      // Incluye datos básicos del usuario en el detalle público
       .populate({
         path: 'usuario',
         select: 'nombre _id',
       })
       .lean();
 
-    // Por privacidad, respondemos 404 si no existe o no es pública
+    // Por privacidad, se responde 404 si no existe o no es pública
     if (!doc || doc.visibilidad !== 'publico') {
       return res.status(404).json({ ok: false, mensaje: 'No encontrada' });
     }
 
     return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
-    return res.status(500).json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
   }
 }
 
@@ -379,7 +390,7 @@ export async function una(req, res) {
     if (!isValidId(id)) return res.status(400).json({ ok: false, mensaje: 'ID inválido' });
 
     const doc = await Tarjeta.findById(id)
-      // NUEVO: también traemos el usuario (nombre) en el detalle privado
+      // Incluye datos básicos del usuario en el detalle privado
       .populate({
         path: 'usuario',
         select: 'nombre _id',
@@ -390,7 +401,7 @@ export async function una(req, res) {
     const esMia = req.usuario && String(doc.usuario._id || doc.usuario) === req.usuario.id;
 
     if (!esMia) {
-      // Pública → ok
+      // Pública → OK
       if (doc.visibilidad === 'publico') {
         return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
       }
@@ -406,7 +417,9 @@ export async function una(req, res) {
 
     return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
-    return res.status(500).json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error obteniendo tarjeta', error: e.message });
   }
 }
 
@@ -485,7 +498,9 @@ export async function actualizar(req, res) {
     return res.json({ ok: true, tarjeta: serializeTarjeta(doc) });
   } catch (e) {
     if (e?.name === 'ValidationError') {
-      return res.status(422).json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
+      return res
+        .status(422)
+        .json({ ok: false, mensaje: 'Datos inválidos', errores: mapValidationError(e) });
     }
     return res.status(500).json({ ok: false, mensaje: e.message });
   }
@@ -505,19 +520,21 @@ export async function eliminar(req, res) {
     await doc.deleteOne();
     return res.json({ ok: true, mensaje: 'Eliminada' });
   } catch (e) {
-    return res.status(500).json({ ok: false, mensaje: 'Error eliminando', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error eliminando', error: e.message });
   }
 }
 
 // ---------- Subir 1 imagen (multipart/form-data, campo "file") ----------
-// Versión PRO: optimiza la imagen con sharp (reduce peso y tamaño)
+// Optimiza la imagen con sharp (tamaño y peso) antes de exponerla.
 export async function subirImagen(req, res) {
   try {
     if (!req.file) {
       return res.status(400).json({ ok: false, mensaje: 'No se recibió archivo' });
     }
 
-    // Ruta al fichero original que multer ha guardado
+    // Ruta al fichero original guardado por multer
     const originalPath = req.file.path || path.join(UPLOAD_DIR, req.file.filename);
 
     // Base del nombre (sin extensión)
@@ -531,7 +548,7 @@ export async function subirImagen(req, res) {
     const optimizedPath = path.join(UPLOAD_DIR, optimizedName);
     const thumbPath = path.join(UPLOAD_DIR, thumbName);
 
-    // Procesar imagen principal (máx 1600x1600)
+    // Imagen principal (máx 1600x1600)
     await sharp(originalPath)
       .rotate()
       .resize({
@@ -543,7 +560,7 @@ export async function subirImagen(req, res) {
       .jpeg({ quality: 80, mozjpeg: true })
       .toFile(optimizedPath);
 
-    // Miniatura para listados (ej. 400x300)
+    // Miniatura para listados (400x300)
     await sharp(originalPath)
       .rotate()
       .resize({
@@ -554,20 +571,20 @@ export async function subirImagen(req, res) {
       .jpeg({ quality: 70, mozjpeg: true })
       .toFile(thumbPath);
 
-    // Opcional: borrar el original para no ocupar espacio
+    // Opcional: borrar el original para ahorrar espacio
     try {
       await fs.unlink(originalPath);
     } catch {
-      // Si falla el borrado no rompemos la respuesta
+      // Si falla el borrado no se interrumpe la respuesta
     }
 
     // Construir URLs públicas
-    const base = baseUploads(req); // p.ej. https://tu-dominio/uploads
+    const base = baseUploads(req); // ej: https://tu-dominio/uploads
     const url = `${base}/${optimizedName}`;
     const publicUrl = `/api/uploads/${optimizedName}`;
     const thumbUrl = `/api/uploads/${thumbName}`;
 
-    // Tamaño del fichero optimizado (por curiosidad / debug)
+    // Tamaño del fichero optimizado (informativo)
     let size = null;
     try {
       const stats = await fs.stat(optimizedPath);
@@ -580,14 +597,16 @@ export async function subirImagen(req, res) {
       ok: true,
       mensaje: 'Imagen subida y optimizada',
       url,          // URL absoluta basada en host
-      publicUrl,    // URL relativa que ya usas en el front
-      thumbUrl,     // miniatura (por si la quieres usar en el futuro)
+      publicUrl,    // URL relativa que usa el front
+      thumbUrl,     // miniatura por si se quiere usar
       filename: optimizedName,
       mimetype: 'image/jpeg',
       size,
     });
   } catch (e) {
     console.error('Error en subirImagen:', e);
-    return res.status(500).json({ ok: false, mensaje: 'Error subiendo imagen', error: e.message });
+    return res
+      .status(500)
+      .json({ ok: false, mensaje: 'Error subiendo imagen', error: e.message });
   }
 }

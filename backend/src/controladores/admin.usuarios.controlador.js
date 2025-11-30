@@ -1,19 +1,15 @@
 // backend/src/controladores/admin.usuarios.controlador.js
 // ————————————————————————————————————————————————
-// Controlador de administración para GESTIÓN DE USUARIOS
-// Incluye:
-//  - Listado con filtros
-//  - Bloquear / Desbloquear
-//  - Soft delete / Restaurar (afecta a tarjetas y comentarios)
-//  - Cambiar rol
-//  - Eliminar DEFINITIVO
+// Controlador de administración de usuarios
+// Operaciones: listado, bloqueo, soft delete, restauración,
+// cambio de rol y eliminación definitiva.
 // ————————————————————————————————————————————————
 
 import Usuario from "../modelos/usuario.modelo.js";
 import Tarjeta from "../modelos/tarjeta.modelo.js";
 import Comentario from "../modelos/comentario.modelo.js";
 
-// Protección: solo admins (comprobando en BD con el id del token)
+// Comprueba que la petición la realiza un usuario con rol administrador
 async function asegurarAdmin(req, res) {
   try {
     if (!req.usuario || !req.usuario.id) {
@@ -24,7 +20,6 @@ async function asegurarAdmin(req, res) {
       return false;
     }
 
-    // Cargamos el usuario real desde Mongo para ver su rol
     const u = await Usuario.findById(req.usuario.id).select("rol");
 
     if (!u || u.rol !== "admin") {
@@ -46,6 +41,7 @@ async function asegurarAdmin(req, res) {
 // ————————————————————————————————————————————————
 // LISTAR USUARIOS
 // GET /api/admin/usuarios
+// Devuelve usuarios con filtros y paginación.
 // ————————————————————————————————————————————————
 export async function listarUsuarios(req, res) {
   if (!(await asegurarAdmin(req, res))) return;
@@ -55,7 +51,7 @@ export async function listarUsuarios(req, res) {
       q = "",
       rol = "",
       estado = "", // activo / bloqueado / eliminado
-      incDel = "", // ya no lo usamos directamente
+      incDel = "", // ya no se usa directamente
       page = 1,
       limit = 25,
       orden = "-createdAt",
@@ -66,7 +62,7 @@ export async function listarUsuarios(req, res) {
 
     const filtros = {};
 
-    // texto en nombre o email
+    // Búsqueda por nombre o email
     if (q.trim()) {
       filtros.$or = [
         { nombre: new RegExp(q.trim(), "i") },
@@ -74,10 +70,10 @@ export async function listarUsuarios(req, res) {
       ];
     }
 
-    // filtro por rol
+    // Filtro por rol
     if (rol) filtros.rol = rol;
 
-    // filtro por estado (para el combo de la UI)
+    // Filtro por estado general
     if (estado === "activo") {
       filtros.eliminado = false;
       filtros.bloqueado = false;
@@ -87,7 +83,6 @@ export async function listarUsuarios(req, res) {
     } else if (estado === "eliminado") {
       filtros.eliminado = true;
     }
-    // si estado === "" → no filtramos por eliminado/bloqueado para que se vean todos
 
     const skip = (page - 1) * limit;
 
@@ -113,8 +108,9 @@ export async function listarUsuarios(req, res) {
 }
 
 // ————————————————————————————————————————————————
-// SOFT DELETE (MARCAR ELIMINADO + OCULTAR CONTENIDO)
+// SOFT DELETE
 // DELETE /api/admin/usuarios/:id
+// Marca el usuario como eliminado y oculta su contenido.
 // ————————————————————————————————————————————————
 export async function eliminarUsuario(req, res) {
   if (!(await asegurarAdmin(req, res))) return;
@@ -133,15 +129,13 @@ export async function eliminarUsuario(req, res) {
     const ahora = new Date();
     const motivoFinal = motivo || "No especificado";
 
-    // Marcar usuario como eliminado (soft delete)
+    // Marca el usuario como eliminado (borrado lógico)
     u.eliminado = true;
     u.eliminadoMotivo = motivoFinal;
     u.eliminadoEn = ahora;
     await u.save();
 
-    // ——— CASCADA: tarjetas y comentarios del usuario ———
-
-    // 1) Tarjetas: marcar como eliminadas (no se borran de la BD)
+    // Tarjetas del usuario: se marcan como eliminadas
     await Tarjeta.updateMany(
       { usuario: id, eliminado: { $ne: true } },
       {
@@ -154,7 +148,7 @@ export async function eliminarUsuario(req, res) {
       }
     );
 
-    // 2) Comentarios: pasarlos a estado "oculto"
+    // Comentarios del usuario: se dejan en estado "oculto"
     await Comentario.updateMany(
       { usuario: id, estado: { $ne: "oculto" } },
       {
@@ -179,8 +173,9 @@ export async function eliminarUsuario(req, res) {
 }
 
 // ————————————————————————————————————————————————
-// RESTAURAR SOFT DELETE (+ RESTAURAR CONTENIDO)
+// RESTAURAR SOFT DELETE
 // PATCH /api/admin/usuarios/:id/restaurar
+// Reactiva al usuario y recupera su contenido.
 // ————————————————————————————————————————————————
 export async function restaurarUsuario(req, res) {
   if (!(await asegurarAdmin(req, res))) return;
@@ -200,9 +195,7 @@ export async function restaurarUsuario(req, res) {
     u.eliminadoEn = null;
     await u.save();
 
-    // ——— CASCADA INVERSA: restaurar tarjetas y comentarios ———
-
-    // 1) Tarjetas: volver a marcarlas como no eliminadas
+    // Tarjetas: se marcan como activas de nuevo
     await Tarjeta.updateMany(
       { usuario: id, eliminado: true },
       {
@@ -215,7 +208,7 @@ export async function restaurarUsuario(req, res) {
       }
     );
 
-    // 2) Comentarios: volver a "publicado" los que estaban ocultos por este usuario
+    // Comentarios: se vuelven a publicar
     await Comentario.updateMany(
       { usuario: id, estado: "oculto" },
       {
@@ -241,6 +234,7 @@ export async function restaurarUsuario(req, res) {
 // ————————————————————————————————————————————————
 // BLOQUEAR / DESBLOQUEAR
 // PATCH /api/admin/usuarios/:id/bloqueo
+// Controla si el usuario puede iniciar sesión.
 // ————————————————————————————————————————————————
 export async function cambiarBloqueo(req, res) {
   if (!(await asegurarAdmin(req, res))) return;
@@ -274,6 +268,7 @@ export async function cambiarBloqueo(req, res) {
 // ————————————————————————————————————————————————
 // CAMBIAR ROL
 // PATCH /api/admin/usuarios/:id/rol
+// Actualiza el rol del usuario (usuario/admin).
 // ————————————————————————————————————————————————
 export async function cambiarRol(req, res) {
   if (!(await asegurarAdmin(req, res))) return;
@@ -308,6 +303,7 @@ export async function cambiarRol(req, res) {
 // ————————————————————————————————————————————————
 // ELIMINACIÓN DEFINITIVA
 // DELETE /api/admin/usuarios/:id/definitivo
+// Borra al usuario de la base de datos.
 // ————————————————————————————————————————————————
 export async function eliminarDefinitivo(req, res) {
   if (!(await asegurarAdmin(req, res))) return;

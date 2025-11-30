@@ -1,12 +1,12 @@
 // src/paginas/Terminos.jsx
-// Aviso Legal y Condiciones de Uso para Explora Huelva (España)
+// Página de términos legales y condiciones de uso de Explora Huelva.
 
 import { Link } from "react-router-dom";
 
 export default function Terminos() {
   return (
     <main className="container py-4">
-      {/* CABECERA */}
+      {/* Cabecera */}
       <header className="mb-4">
         <h1 className="h4 fw-bold mb-2">
           <i className="bi bi-file-earmark-text me-2" />
@@ -17,9 +17,8 @@ export default function Terminos() {
         </p>
       </header>
 
-      {/* CONTENIDO */}
+      {/* Contenido principal */}
       <article className="card border-0 shadow-sm p-4">
-
         {/* 1. Información del titular */}
         <section className="mb-4">
           <h2 className="h5 fw-bold mb-3">1. Información del titular</h2>
@@ -30,7 +29,10 @@ export default function Terminos() {
           <ul className="text-muted mb-0">
             <li><strong>Nombre:</strong> Explora Huelva (proyecto personal)</li>
             <li><strong>Email de contacto:</strong> contacto@explorahuelva.com</li>
-            <li><strong>Finalidad:</strong> plataforma informativa y social sobre rutas, lugares y experiencias de la provincia de Huelva.</li>
+            <li>
+              <strong>Finalidad:</strong> plataforma informativa y social sobre rutas,
+              lugares y experiencias de la provincia de Huelva.
+            </li>
           </ul>
         </section>
 
@@ -87,7 +89,7 @@ export default function Terminos() {
           </p>
         </section>
 
-        {/* 6. Contenidos enviados por los usuarios */}
+        {/* 6. Contenidos de usuarios */}
         <section className="mb-4">
           <h2 className="h5 fw-bold mb-3">6. Contenidos enviados por los usuarios</h2>
           <p className="text-muted">
@@ -96,7 +98,10 @@ export default function Terminos() {
 
           <ul className="text-muted">
             <li>Garantizas que eres el autor o tienes derechos para publicarlo.</li>
-            <li>Concedes a Explora Huelva una licencia no exclusiva de uso y exhibición dentro de la plataforma.</li>
+            <li>
+              Concedes a Explora Huelva una licencia no exclusiva de uso y
+              exhibición dentro de la plataforma.
+            </li>
             <li>El contenido podrá ser eliminado si infringe estas condiciones.</li>
           </ul>
         </section>
@@ -105,12 +110,12 @@ export default function Terminos() {
         <section className="mb-4">
           <h2 className="h5 fw-bold mb-3">7. Enlaces externos</h2>
           <p className="text-muted">
-            Explora Huelva puede incluir enlaces a páginas de terceros.  
+            Explora Huelva puede incluir enlaces a páginas de terceros.
             No nos responsabilizamos de su contenido ni de su política de privacidad.
           </p>
         </section>
 
-        {/* 8. Exoneración de responsabilidad */}
+        {/* 8. Responsabilidad */}
         <section className="mb-4">
           <h2 className="h5 fw-bold mb-3">8. Exoneración de responsabilidad</h2>
           <p className="text-muted">
@@ -124,7 +129,7 @@ export default function Terminos() {
           </p>
         </section>
 
-        {/* 9. Suspensión o cierre de la plataforma */}
+        {/* 9. Suspensión del servicio */}
         <section className="mb-4">
           <h2 className="h5 fw-bold mb-3">9. Suspensión del servicio</h2>
           <p className="text-muted mb-0">
@@ -138,15 +143,14 @@ export default function Terminos() {
         <section className="mb-2">
           <h2 className="h5 fw-bold mb-3">10. Legislación aplicable</h2>
           <p className="text-muted mb-0">
-            Los presentes términos se rigen por la legislación española.  
+            Los presentes términos se rigen por la legislación española.
             En caso de conflicto, las partes se someten a los juzgados y
             tribunales de Huelva (España).
           </p>
         </section>
-
       </article>
 
-      {/* ENLACE DE VUELTA */}
+      {/* Enlace de vuelta */}
       <div className="mt-4">
         <Link className="btn btn-secondary" to="/">
           Volver al inicio

@@ -1,23 +1,20 @@
 // src/paginas/EditorTarjeta.jsx
 // Pantalla para crear o editar una tarjeta.
-// Nota importante: las imágenes se aceptan tal cual las sube el usuario,
-// pero la optimización "de verdad" (tamaño y peso) se hace en el backend
-// usando sharp. Aquí solo avisamos si el fichero es muy grande.
+// Las imágenes se aceptan tal como las sube el usuario; la optimización real
+// (tamaño y peso) se realiza en el backend usando sharp.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { tarjetasApi } from '../servicios/tarjetas';
-// ❌ ya no necesitamos transformar URLs aquí: la API devuelve /api/uploads/...
-// import { urlImagen } from '../servicios/api';
 import { logout } from '../utils/auth';
 
 const OPCIONES_ETIQUETAS = ['lugares', 'experiencias', 'rutas'];
 const OPCIONES_VISIBILIDAD = ['privado', 'publico', 'amigos'];
 
-// Emojis y chips modernos para 2025 😎
+// Listado de emojis sugeridos para la descripción
 const EMOJIS_MODERNOS = ['📍', '✨', '🌅', '🏖️', '🚶‍♀️', '🚴‍♂️', '🍽️', '🌲'];
 
-// Pequeñas plantillas de texto para rellenar rápido la descripción
+// Plantillas de texto para ayudar a estructurar la descripción
 const PLANTILLAS_DESC = [
   {
     id: 'basica',
@@ -50,8 +47,8 @@ const PLANTILLAS_DESC = [
   },
 ];
 
-// Límite "blando" solo para avisar al usuario en el frontend.
-// No bloquea la subida: el backend es quien optimiza/limita realmente.
+// Límite de tamaño orientativo para avisar al usuario (MB).
+// No bloquea la subida: el backend es quien decide y optimiza.
 const MAX_IMG_MB = 8;
 
 // Normaliza números desde input (admite coma decimal). '' -> null
@@ -62,7 +59,7 @@ const toNum = (s) => {
   return Number.isFinite(n) ? n : NaN;
 };
 
-// Detecta cancelación para no ensuciar la UI
+// Detecta cancelación de peticiones para no mostrar errores innecesarios
 const isAbortError = (e) =>
   e?.name === 'AbortError' ||
   e?.code === 'ERR_CANCELED' ||
@@ -96,7 +93,7 @@ export default function EditorTarjeta() {
 
   const esEdicion = Boolean(id);
 
-  // 👉 helper para insertar emojis / texto en la descripción
+  // Inserta texto o emojis en la descripción
   const insertarTextoDescripcion = (trozo) => {
     setForm((f) => ({
       ...f,
@@ -107,7 +104,7 @@ export default function EditorTarjeta() {
     }));
   };
 
-  // Cargar tarjeta en modo edición
+  // Cargar datos de la tarjeta en modo edición
   const cargar = useCallback(async () => {
     if (!id) return;
     setMensaje('');
@@ -122,7 +119,7 @@ export default function EditorTarjeta() {
       setForm({
         titulo: t.titulo || '',
         descripcion: t.descripcion || '',
-        // La API ya normaliza a "/api/uploads/...", úsalo tal cual
+        // La API ya entrega rutas tipo "/api/uploads/..."; se usan directamente.
         imagenes: Array.isArray(t.imagenes)
           ? t.imagenes
           : t.imagenUrl
@@ -156,7 +153,7 @@ export default function EditorTarjeta() {
     return () => loadAbortRef.current?.abort();
   }, [cargar]);
 
-  // Handlers básicos
+  // Actualizar campos de formulario
   const cambiar = (e) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
@@ -164,32 +161,29 @@ export default function EditorTarjeta() {
 
   const seleccionarArchivo = () => fileRef.current?.click();
 
-  // Subir una imagen (deja subir cualquier tamaño razonable,
-  // solo avisa si es muy grande; el backend la optimiza con sharp).
+  // Subir una imagen: se valida de forma básica y el backend se encarga de optimizarla
   const onFileChange = async (e) => {
     const f = e.target.files?.[0];
-    e.target.value = ''; // resetea siempre el input para permitir re-seleccionar
+    e.target.value = ''; // permite volver a seleccionar el mismo archivo
     if (!f) return;
 
     setMensaje('');
 
-    // 1) Validamos que realmente sea una imagen
+    // Validación básica de tipo
     if (!f.type.startsWith('image/')) {
       setMensaje('El archivo debe ser una imagen.');
       return;
     }
 
-    // 2) Si supera el tamaño "blando", solo mostramos un aviso,
-    //    pero NO bloqueamos la subida. El trabajo serio lo hace el backend.
+    // Aviso de tamaño grande (no bloqueante)
     if (f.size > MAX_IMG_MB * 1024 * 1024) {
       setMensaje(
         `Ojo: la imagen es muy pesada (más de ${MAX_IMG_MB}MB), ` +
           'la optimizaremos en el servidor para que la web siga yendo fluida.'
       );
-      // No hay return aquí: dejamos pasar el fichero.
     }
 
-    // Cancelamos subida anterior si la hubiera
+    // Cancelar subida anterior, si existe
     uploadAbortRef.current?.abort();
     const controller = new AbortController();
     uploadAbortRef.current = controller;
@@ -197,17 +191,16 @@ export default function EditorTarjeta() {
     try {
       setSubiendo(true);
 
-      // Enviamos el fichero original: el backend (sharp) lo redimensiona y lo comprime.
       const r = await tarjetasApi.subirImagen(f, {
         signal: controller.signal,
       });
 
-      // ⬇️ La API devuelve { publicUrl, filename, url }. Para el front usamos publicUrl.
-      const nueva = r.publicUrl || r.url; // fallback por si el backend no está actualizado
+      // La API devuelve { publicUrl, filename, url }. Se prioriza publicUrl.
+      const nueva = r.publicUrl || r.url;
       if (!nueva)
         throw new Error('Respuesta inesperada al subir imagen');
 
-      // Añadir URL evitando duplicados (por si el usuario sube la misma varias veces)
+      // Añadir URL evitando duplicados
       setForm((prev) => {
         const set = new Set(
           [...(prev.imagenes || []), nueva].filter(Boolean)
@@ -244,7 +237,7 @@ export default function EditorTarjeta() {
     });
   };
 
-  // Reglas de obligatoriedad (vídeo es opcional pero lo ocultamos)
+  // Reglas de campos obligatorios (el vídeo es opcional)
   const faltan = {
     titulo: !form.titulo.trim(),
     descripcion: !form.descripcion.trim(),
@@ -259,7 +252,7 @@ export default function EditorTarjeta() {
     !faltan.etiquetas &&
     !faltan.imagenes;
 
-  // Validación de ubicación (oculta lat/lng pero mantenemos la lógica para no romper)
+  // Validación de ubicación (lat/lng se mantienen aunque no se muestren inputs)
   const latProvided = String(form.lat ?? '').trim() !== '';
   const lngProvided = String(form.lng ?? '').trim() !== '';
   const latNum = toNum(form.lat);
@@ -285,7 +278,7 @@ export default function EditorTarjeta() {
       latInRange &&
       lngInRange);
 
-  // Botón: Usar mi ubicación (Geolocation API) — mantenemos el botón, ocultamos inputs
+  // Botón para obtener la ubicación actual con la Geolocation API
   const usarMiUbicacion = () => {
     setMensaje('');
     setAccuracy(null);
@@ -322,7 +315,7 @@ export default function EditorTarjeta() {
     );
   };
 
-  // Guardar (crear/actualizar)
+  // Guardar tarjeta (crear o actualizar)
   const enviar = async (e) => {
     e.preventDefault();
     setMensaje('');
@@ -348,7 +341,7 @@ export default function EditorTarjeta() {
       titulo: form.titulo.trim(),
       descripcion: form.descripcion.trim(),
       visibilidad: form.visibilidad,
-      // La API ya acepta arrays de strings; pueden ser /api/uploads/... y los normaliza.
+      // La API acepta arrays de strings; se envían las rutas tal como llegan.
       imagenes: (form.imagenes || [])
         .map((s) => s.trim())
         .filter(Boolean),
@@ -383,13 +376,13 @@ export default function EditorTarjeta() {
   };
 
   const longitudDesc = form.descripcion.length;
-  const cercaLimite = longitudDesc > 900; // a partir de 900/1000 ponemos el numerito en rojo
+  const cercaLimite = longitudDesc > 900; // a partir de 900/1000 se resalta el contador
 
   return (
     <div className="container py-4">
       <div className="row justify-content-center">
         <div className="col-12 col-lg-9">
-          {/* Cabecera visual tipo “wizard” */}
+          {/* Cabecera tipo asistente de pasos */}
           <div className="mb-3">
             <span className="badge rounded-pill text-bg-primary me-2">
               {esEdicion ? 'Editar tarjeta' : 'Nueva tarjeta'}
@@ -400,7 +393,7 @@ export default function EditorTarjeta() {
           </div>
 
           <div className="card shadow border-0">
-            {/* Cinta superior colorida */}
+            {/* Cabecera visual de la tarjeta */}
             <div className="card-header border-0 bg-gradient bg-primary text-light py-3">
               <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
@@ -472,7 +465,7 @@ export default function EditorTarjeta() {
                       )}
                     </div>
 
-                    {/* Descripción con emojis + plantillas + contador */}
+                    {/* Descripción con emojis, plantillas y contador */}
                     <div className="col-12">
                       <div className="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
                         <label
@@ -547,7 +540,7 @@ export default function EditorTarjeta() {
                         className="d-flex justify-content-between align-items-center mt-1"
                       >
                         <span className="form-text">
-                          Usa emojis y, si quieres, una plantilla para estructurar la experiencia.
+                          Puedes usar emojis y plantillas para organizar la experiencia.
                         </span>
                         <span
                           className={`small ${
@@ -605,7 +598,7 @@ export default function EditorTarjeta() {
                         aria-label={`Imagen ${i + 1}`}
                       >
                         <img
-                          // La API ya devuelve una URL lista para <img src>, úsala sin transformaciones
+                          // La API ya devuelve una URL válida para <img src>
                           src={url}
                           alt=""
                           style={{
@@ -644,7 +637,7 @@ export default function EditorTarjeta() {
                     <i className="bi bi-shield-check me-2" />
                     Evita subir fotos con datos personales sensibles o de otras personas
                     sin su consentimiento. Las imágenes se optimizan en el servidor para
-                    que la app vaya fluida.
+                    mejorar el rendimiento de la aplicación.
                   </div>
                 </div>
 
@@ -682,7 +675,7 @@ export default function EditorTarjeta() {
                         <option value="amigos">Amigos</option>
                       </select>
                       <div className="form-text">
-                        Elige quién puede ver esta tarjeta en Explora Huelva.
+                        Define quién puede ver esta tarjeta en la plataforma.
                       </div>
                       {!OPCIONES_VISIBILIDAD.includes(form.visibilidad) && (
                         <div className="invalid-feedback">
@@ -724,7 +717,7 @@ export default function EditorTarjeta() {
                           id="ayuda-etiquetas"
                           className="form-text"
                         >
-                          Esto ayuda a clasificar tu tarjeta en el buscador
+                          Sirven para clasificar la tarjeta en el buscador
                           (Lugares, Rutas, Experiencias).
                         </div>
                         {(form.etiquetas || []).length === 0 && (
@@ -764,7 +757,7 @@ export default function EditorTarjeta() {
 
                   {accuracy != null && (
                     <div className="form-text mt-1">
-                      Precisión aprox.: ±{accuracy} m
+                      Precisión aproximada: ±{accuracy} m
                     </div>
                   )}
 

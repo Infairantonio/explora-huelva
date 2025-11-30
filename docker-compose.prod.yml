@@ -28,7 +28,7 @@ services:
       SMTP_HOST: smtp.hostinger.com
       SMTP_PORT: "587"          # usa "465" si vas con SSL puro
       SMTP_USER: no-reply@explorahuelva.es
-      SMTP_PASS: Juantalmera.5
+      SMTP_PASS: Juantalamera.5
       SMTP_SECURE: "false"      # "true" si usas 465
       MAIL_FROM: Explora Huelva <no-reply@explorahuelva.es>
     volumes:

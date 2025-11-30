@@ -1,19 +1,20 @@
 // src/servicios/adminUsuarios.js
-// Servicio para el panel de administración de USUARIOS
+// Servicio para gestionar usuarios desde el panel de administración.
 
 import { API_URL, getToken } from "./api";
 
-// Header Authorization (si hay token)
+// Cabecera con token si está disponible
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
-// Parse genérico con throw si !res.ok
+// Manejo estándar de respuestas de la API
 async function handle(res) {
   const ct = res.headers.get("content-type") || "";
   const isJson = ct.includes("application/json");
   const data = isJson ? await res.json().catch(() => ({})) : await res.text();
+
   if (!res.ok) {
     const msg = (isJson && data?.mensaje) || res.statusText || "Error de red";
     const err = new Error(msg);
@@ -21,10 +22,11 @@ async function handle(res) {
     err.payload = data;
     throw err;
   }
+
   return data;
 }
 
-// Helper querystring
+// Construcción de querystring limpia
 const qs = (obj = {}) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(obj)) {
@@ -36,20 +38,17 @@ const qs = (obj = {}) => {
 };
 
 export const adminUsuariosApi = {
-  // === Listar usuarios (con filtros, paginación, etc.)
+  // Listado de usuarios (con filtros y paginación)
   async listar(params = {}, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios${qs(params)}`, {
       ...options,
-      headers: {
-        ...authHeader(),
-        ...(options.headers || {}),
-      },
+      headers: { ...authHeader(), ...(options.headers || {}) },
       cache: "no-store",
     });
     return handle(r);
   },
 
-  // === Cambiar rol (usuario/admin)
+  // Cambio de rol (usuario ↔ admin)
   async cambiarRol(id, rol, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios/${id}/rol`, {
       method: "PATCH",
@@ -64,7 +63,7 @@ export const adminUsuariosApi = {
     return handle(r);
   },
 
-  // === Bloquear usuario
+  // Bloquear usuario
   async bloquear(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios/${id}/bloqueo`, {
       method: "PATCH",
@@ -79,7 +78,7 @@ export const adminUsuariosApi = {
     return handle(r);
   },
 
-  // === Desbloquear usuario
+  // Desbloquear usuario
   async desbloquear(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios/${id}/bloqueo`, {
       method: "PATCH",
@@ -94,7 +93,7 @@ export const adminUsuariosApi = {
     return handle(r);
   },
 
-  // === Soft delete (marcar como eliminado + cascada en backend)
+  // Eliminación suave (soft delete)
   async eliminar(id, motivo, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios/${id}`, {
       method: "DELETE",
@@ -109,27 +108,21 @@ export const adminUsuariosApi = {
     return handle(r);
   },
 
-  // === Restaurar usuario (y contenido) eliminado
+  // Restaurar usuario eliminado
   async restaurar(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios/${id}/restaurar`, {
       method: "PATCH",
-      headers: {
-        ...authHeader(),
-        ...(options.headers || {}),
-      },
+      headers: { ...authHeader(), ...(options.headers || {}) },
       ...options,
     });
     return handle(r);
   },
 
-  // === Eliminar DEFINITIVO (opcional, por si lo usas en el futuro)
+  // Eliminación definitiva (opcional para futuro)
   async eliminarDefinitivo(id, options = {}) {
     const r = await fetch(`${API_URL}/admin/usuarios/${id}/definitivo`, {
       method: "DELETE",
-      headers: {
-        ...authHeader(),
-        ...(options.headers || {}),
-      },
+      headers: { ...authHeader(), ...(options.headers || {}) },
       ...options,
     });
     return handle(r);

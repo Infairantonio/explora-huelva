@@ -1,13 +1,14 @@
 // backend/src/modelos/usuario.modelo.js
 // ————————————————————————————————————————————————————————
-// Esquema Mongoose para usuarios (registro/login seguro) con:
-// - Email único y normalizado.
-// - Hash de contraseña (nunca en claro).
-// - Roles (usuario/admin).
-// - Verificación de email (token + caducidad).
-// - Reset de contraseña (token + caducidad).
-// - Controles anti-fuerza bruta (intentos fallidos + bloqueo temporal).
-// - Campos extra para gestión desde el panel de administración.
+// Modelo "Usuario" para registro y login seguro.
+// Incluye:
+//  - Email único y normalizado
+//  - Contraseña hasheada (nunca en claro)
+//  - Roles: usuario / admin
+//  - Verificación de email (token + caducidad)
+//  - Reset de contraseña (token + caducidad)
+//  - Protección anti fuerza bruta (intentos + bloqueo)
+//  - Campos de bloqueo y eliminación para panel de administración
 // ————————————————————————————————————————————————————————
 
 import mongoose from "mongoose";
@@ -17,7 +18,12 @@ const { Schema } = mongoose;
 
 const UsuarioSchema = new Schema(
   {
-    nombre: { type: String, required: true, trim: true, maxlength: 80 },
+    nombre: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 80,
+    },
 
     email: {
       type: String,
@@ -31,7 +37,7 @@ const UsuarioSchema = new Schema(
       },
     },
 
-    // Hash de la contraseña (nunca guardar contraseña en claro)
+    // Hash de la contraseña (no se guarda nunca en claro)
     passwordHash: { type: String, required: true },
 
     // Rol del usuario
@@ -42,29 +48,29 @@ const UsuarioSchema = new Schema(
       index: true,
     },
 
-    // —— Verificación de email ——
+    // ——— Verificación de email ———
     emailVerified: { type: Boolean, default: false },
     verificationToken: { type: String, default: null, index: true },
     verificationExpires: { type: Date, default: null },
 
-    // —— Reset de contraseña ——
+    // ——— Reset de contraseña ———
     resetToken: { type: String, default: null, index: true },
     resetExpires: { type: Date, default: null },
 
-    // —— Anti-fuerza bruta / bloqueo temporal ——
+    // ——— Anti fuerza bruta / bloqueo ———
     failedLoginCount: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null, index: true },
 
-    // —— Gestión desde panel admin ——
-    // Bloqueo manual (además del bloqueo automático por intentos)
+    // ——— Gestión desde panel admin ———
+    // Bloqueo manual (además del automático por intentos)
     bloqueado: { type: Boolean, default: false },
 
-    // Soft delete (no se borra físicamente de la BD)
+    // Soft delete (no se borra físicamente)
     eliminado: { type: Boolean, default: false },
     eliminadoMotivo: { type: String, trim: true, maxlength: 500 },
     eliminadoEn: { type: Date, default: null },
 
-    // Información opcional: último login correcto
+    // Último login correcto (opcional)
     lastLoginAt: { type: Date, default: null },
   },
   {
@@ -73,7 +79,7 @@ const UsuarioSchema = new Schema(
       virtuals: true,
       versionKey: false,
       transform: (_doc, ret) => {
-        // Nunca exponer estos campos al frontend
+        // Nunca exponer datos sensibles al frontend
         delete ret.passwordHash;
         delete ret.verificationToken;
         delete ret.verificationExpires;
@@ -101,11 +107,13 @@ UsuarioSchema.methods.validatePassword = function (plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
 
+// Incrementa contador de fallos y aplica bloqueo temporal si toca
 UsuarioSchema.methods.startLoginLockIfNeeded = function (
   maxFallos = 5,
   minutosBloqueo = 10
 ) {
   this.failedLoginCount = (this.failedLoginCount || 0) + 1;
+
   if (this.failedLoginCount >= maxFallos) {
     const d = new Date();
     d.setMinutes(d.getMinutes() + minutosBloqueo);
@@ -114,13 +122,14 @@ UsuarioSchema.methods.startLoginLockIfNeeded = function (
   }
 };
 
+// Limpia contador y bloqueo
 UsuarioSchema.methods.resetLoginLock = function () {
   this.failedLoginCount = 0;
   this.lockUntil = null;
 };
 
+// Indica si la cuenta está bloqueada (manual o temporal)
 UsuarioSchema.methods.isLocked = function () {
-  // bloqueado manualmente o por lockUntil
   if (this.bloqueado) return true;
   return this.lockUntil && this.lockUntil > new Date();
 };

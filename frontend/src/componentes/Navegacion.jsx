@@ -1,5 +1,5 @@
-// src/componentes/Navegacion.jsx
-// Barra de navegación superior con estado de sesión (Entrar / Panel + Salir)
+// frontend/src/componentes/Navegacion.jsx
+// Barra de navegación superior con enlaces públicos y estado de sesión.
 
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { isAuth, logout } from "../utils/auth";
@@ -8,15 +8,15 @@ import { useCallback } from "react";
 export default function Navegacion() {
   const navigate = useNavigate();
 
-  // Cierra el menú colapsable (útil en móvil) cuando se pulsa un link/botón
+  // Cierra el menú colapsable (útil en móvil) cuando se pulsa un enlace/botón
   const closeMenu = useCallback(() => {
     const collapse = document.getElementById("menu");
     if (!collapse) return;
 
-    // 1) Forzar eliminar manualmente la clase "show"
+    // Quita la clase "show" del menú
     collapse.classList.remove("show");
 
-    // 2) Intentar cerrar usando la instancia de Bootstrap (si existe)
+    // Intenta cerrarlo también usando la instancia de Bootstrap (si existe)
     if (window.bootstrap?.Collapse) {
       const instance =
         window.bootstrap.Collapse.getInstance(collapse) ||
@@ -25,6 +25,7 @@ export default function Navegacion() {
     }
   }, []);
 
+  // Cierra sesión y redirige al login
   const salir = () => {
     logout();
     closeMenu();
@@ -36,12 +37,22 @@ export default function Navegacion() {
   return (
     <nav className="navbar navbar-expand-lg bg-dark navbar-dark shadow-sm fixed-top">
       <div className="container">
-        {/* Logo */}
-        <Link className="navbar-brand fw-bold" to="/" onClick={closeMenu}>
-          <i className="bi bi-map-fill me-2"></i> Explora Huelva
+        {/* Logo / enlace a inicio */}
+        <Link
+          className="navbar-brand fw-bold d-flex align-items-center"
+          to="/"
+          onClick={closeMenu}
+        >
+          <img
+            src="/blog/logo.svg"        // logo dentro de frontend/public/blog
+            alt="Explora Huelva"
+            className="me-2"
+            style={{ height: 40, width: "auto" }}  // puedes bajar a 32 si lo quieres más pequeño
+          />
+          <span>Explora Huelva</span>
         </Link>
 
-        {/* Hamburguesa */}
+        {/* Botón hamburguesa (versión móvil) */}
         <button
           className="navbar-toggler"
           type="button"
@@ -57,6 +68,7 @@ export default function Navegacion() {
         {/* Menú colapsable */}
         <div className="collapse navbar-collapse" id="menu">
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
+            {/* Inicio */}
             <li className="nav-item">
               <NavLink
                 to="/"
@@ -108,6 +120,7 @@ export default function Navegacion() {
               </NavLink>
             </li>
 
+            {/* Zona según estado de sesión */}
             {autenticado ? (
               <>
                 <li className="nav-item">
@@ -142,12 +155,17 @@ export default function Navegacion() {
                     <i className="bi bi-person-circle me-1"></i> Entrar
                   </Link>
                 </li>
-                {/* Si usas registro:
+                {/* Si activas registro en el futuro:
                 <li className="nav-item ms-lg-2">
-                  <Link to="/registro" className="btn btn-outline-light" onClick={closeMenu}>
+                  <Link
+                    to="/registro"
+                    className="btn btn-outline-light"
+                    onClick={closeMenu}
+                  >
                     Crear cuenta
                   </Link>
-                </li> */}
+                </li>
+                */}
               </>
             )}
           </ul>

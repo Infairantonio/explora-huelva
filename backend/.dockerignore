@@ -1,6 +1,33 @@
+# Dependencias y cache
 node_modules
 npm-debug.log
+yarn-error.log*
+yarn-debug.log*
+
+# Archivos de entorno
 .env
+.env.local
+.env.*.local
+
+# Archivos del sistema
 .DS_Store
+Thumbs.db
+
+# Git
 .git
 .gitignore
+.gitattributes
+
+# Logs
+logs
+*.log
+
+# Salidas de build / herramientas
+uploads
+dist
+build
+coverage
+
+# Docker
+Dockerfile.dev
+docker-compose.yml
