@@ -1,12 +1,6 @@
 // src/paginas/Inicio.jsx
 // Página principal pública de Explora Huelva.
-// Muestra el hero y un listado combinado:
-// - Tarjetas públicas
-// - Tarjetas de amigos (si hay sesión)
-// El backend controla el acceso al detalle.
-
-// Carga salud del backend (diagnóstico simple).
-// Mantiene los comentarios esenciales sin tecnicismos.
+// Incluye buscador moderno estilo Google.
 
 import { useEffect, useState } from 'react';
 import Hero from '../componentes/Hero';
@@ -16,7 +10,7 @@ import { API_URL, getToken } from '../servicios/api';
 import banner from '../imagenes/banner.jpg';
 
 export default function Inicio() {
-  // Estado para /api/salud (diagnóstico)
+  // Salud del backend (diagnóstico)
   const [salud, setSalud] = useState(null);
   const [errorSalud, setErrorSalud] = useState('');
 
@@ -35,7 +29,10 @@ export default function Inicio() {
     intentado: false,
   });
 
-  // Saber si hay sesión para decidir botones del hero
+  // Buscador
+  const [busqueda, setBusqueda] = useState("");
+
+  // Saber si hay sesión
   const token = getToken();
 
   const botonPrincipalHero = {
@@ -48,15 +45,14 @@ export default function Inicio() {
     : { texto: 'Iniciar sesión', href: '/login' };
 
   useEffect(() => {
-    // Salud del backend (sigue funcionando pero NO se muestra)
+    // Salud backend
     fetch(`${API_URL}/salud`)
       .then((r) => r.json())
       .then(setSalud)
       .catch((err) => setErrorSalud(err.message));
 
     // Tarjetas públicas
-    tarjetasApi
-      .publicas()
+    tarjetasApi.publicas()
       .then((r) => {
         if (!r.ok)
           throw new Error(r.mensaje || 'No se pudieron cargar las tarjetas públicas');
@@ -66,24 +62,20 @@ export default function Inicio() {
         setPub({ cargando: false, error: e.message, items: [] });
       });
 
-    // Tarjetas de amigos (solo si hay token)
+    // Tarjetas de amigos
     const t = getToken();
     if (t) {
       setAmg((s) => ({ ...s, cargando: true, intentado: true }));
-      tarjetasApi
-        .amigos()
+      tarjetasApi.amigos()
         .then((r) => {
           if (!r.ok)
             throw new Error(r.mensaje || 'No se pudieron cargar tarjetas de amigos');
           setAmg({ cargando: false, error: '', items: r.items || [], intentado: true });
         })
         .catch((e) => {
-          const msg =
-            e?.status === 401 ? '' : e.message || 'Error al cargar tarjetas de amigos';
+          const msg = e?.status === 401 ? '' : e.message || 'Error al cargar tarjetas de amigos';
           setAmg({ cargando: false, error: msg, items: [], intentado: true });
         });
-    } else {
-      setAmg({ cargando: false, error: '', items: [], intentado: false });
     }
   }, []);
 
@@ -94,11 +86,21 @@ export default function Inicio() {
   // Combinado final
   const todas = [...pubVisibles, ...amgVisibles];
 
+  // FILTRO BUSCADOR
+  const filtradas = todas.filter((t) => {
+    const txt = busqueda.toLowerCase();
+    return (
+      t.titulo?.toLowerCase().includes(txt) ||
+      t.descripcion?.toLowerCase().includes(txt) ||
+      t.tags?.join(" ").toLowerCase().includes(txt)
+    );
+  });
+
   const cargandoGlobal = pub.cargando || (amg.intentado && amg.cargando);
 
   return (
     <>
-      {/* HERO principal */}
+      {/* HERO PRINCIPAL */}
       <Hero
         titulo="Explora Huelva"
         subtitulo="Descubre rutas, lugares y experiencias únicas"
@@ -109,15 +111,48 @@ export default function Inicio() {
 
       {/* LISTADO */}
       <div className="container my-4">
+
+        {/* TÍTULO */}
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <h2 className="mb-0 text-primary fw-bold">Explora todas las rutas</h2>
+          <h2 className="mb-0 text-primary fw-bold">Explora Huelva</h2>
         </div>
 
+        {/* CONTADOR */}
         <p className="text-muted small mb-3">
           Públicas: <strong>{pubVisibles.length}</strong> · Amigos:{' '}
           <strong>{amgVisibles.length}</strong>
         </p>
 
+        {/* === BUSCADOR ESTILO GOOGLE === */}
+        <div className="d-flex justify-content-center mb-4">
+          <div className="position-relative" style={{ width: "100%", maxWidth: "500px" }}>
+            <i
+              className="bi bi-search position-absolute text-secondary"
+              style={{
+                left: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                fontSize: "1.1rem"
+              }}
+            ></i>
+
+            <input
+              type="text"
+              className="form-control shadow-sm"
+              style={{
+                paddingLeft: "40px",
+                height: "45px",
+                borderRadius: "12px",
+              }}
+              placeholder="Buscar rutas, lugares o experiencias..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+        </div>
+        {/* === FIN BUSCADOR === */}
+
+        {/* ERRORES */}
         {pub.error && (
           <div className="alert alert-danger py-2">
             Error al cargar tarjetas públicas: {pub.error}
@@ -132,20 +167,20 @@ export default function Inicio() {
           </div>
         )}
 
-        {/* Estados */}
+        {/* LISTADO FINAL */}
         {cargandoGlobal ? (
           <div className="d-flex align-items-center gap-2">
             <div className="spinner-border" role="status" />
             <span>Cargando tarjetas…</span>
           </div>
-        ) : todas.length === 0 ? (
-          <div className="alert alert-info">Aún no hay tarjetas para mostrar.</div>
+        ) : filtradas.length === 0 ? (
+          <div className="alert alert-info">
+            No se encontraron resultados para: <strong>{busqueda}</strong>
+          </div>
         ) : (
           <div className="row g-3">
-            {todas.map((it) => (
+            {filtradas.map((it) => (
               <div key={it._id} className="col-12 col-sm-6 col-lg-4">
-                {/* Siempre mostrar el enlace de detalle.
-                   El backend decide si el usuario puede verlo. */}
                 <TarjetaCard item={it} detalleHref={`/tarjetas/${it._id}`} />
               </div>
             ))}
@@ -153,25 +188,13 @@ export default function Inicio() {
         )}
       </div>
 
-      {/*
-      ======================================================================================
-      PANEL DE ESTADO (OCULTO)
-      ======================================================================================
-      - Seguimos manteniendo el código por si necesitas depurar en el futuro.
-      - Está completamente comentado para que NO se muestre al usuario.
-      - Puedes volver a activarlo fácilmente quitando los comentarios.
-      ======================================================================================
-
+      {/* PANEL OCULTO (DEBUG) */}
+      {/* 
       <div className="container mb-5">
         <h3 className="mb-3 text-primary fw-bold">Panel de Estado</h3>
-        <div
-          className="card shadow-sm border-0"
-          style={{ backgroundColor: 'var(--azul-claro)' }}
-        >
+        <div className="card shadow-sm border-0" style={{ backgroundColor: 'var(--azul-claro)' }}>
           <div className="card-body">
-            <p>
-              <strong>API_URL efectiva:</strong> {API_URL}
-            </p>
+            <p><strong>API_URL efectiva:</strong> {API_URL}</p>
 
             {errorSalud && <div className="alert alert-danger">Error: {errorSalud}</div>}
 
@@ -186,8 +209,6 @@ export default function Inicio() {
           </div>
         </div>
       </div>
-
-      ======================================================================================
       */}
     </>
   );
