@@ -3,10 +3,10 @@
 // Banner flotante de cookies (cumplimiento RGPD básico).
 // - Informa de tipos de cookies (técnicas y analíticas).
 // - Permite aceptar todas o solo las necesarias (rechazar analíticas).
-// - Guarda la decisión en localStorage:
+// - Guarda la decisión en sessionStorage (dura solo la sesión):
 //      • cookies-consent: "all" | "necessary"
 //      • cookies-opcionales: "true" | "false"
-// - Solo se muestra si el usuario aún no eligió.
+// - Se muestra al menos una vez en cada sesión del navegador.
 // -------------------------------------------------------------
 
 import { useEffect, useState } from "react";
@@ -14,13 +14,13 @@ import { useEffect, useState } from "react";
 export default function BannerCookies() {
   const [visible, setVisible] = useState(false);
 
-  // Mostrar el banner solo si no hay consentimiento guardado
+  // Mostrar el banner si en esta sesión aún no se ha elegido
   useEffect(() => {
     try {
-      const consent = localStorage.getItem("cookies-consent");
+      const consent = sessionStorage.getItem("cookies-consent");
       if (!consent) setVisible(true);
     } catch {
-      // Si localStorage falla por alguna razón, mostramos el banner igualmente
+      // Si sessionStorage falla por alguna razón, mostramos el banner igualmente
       setVisible(true);
     }
   }, []);
@@ -28,8 +28,8 @@ export default function BannerCookies() {
   // Aceptar todas las cookies (técnicas + analíticas)
   const aceptarTodo = () => {
     try {
-      localStorage.setItem("cookies-consent", "all");
-      localStorage.setItem("cookies-opcionales", "true"); // listo para Analytics
+      sessionStorage.setItem("cookies-consent", "all");
+      sessionStorage.setItem("cookies-opcionales", "true"); // listo para Analytics
     } catch {
       // si falla, no pasa nada grave; simplemente no recordará la elección
     }
@@ -39,8 +39,8 @@ export default function BannerCookies() {
   // Aceptar solo las necesarias (rechazar analíticas)
   const soloNecesarias = () => {
     try {
-      localStorage.setItem("cookies-consent", "necessary");
-      localStorage.setItem("cookies-opcionales", "false");
+      sessionStorage.setItem("cookies-consent", "necessary");
+      sessionStorage.setItem("cookies-opcionales", "false");
     } catch {
       //
     }

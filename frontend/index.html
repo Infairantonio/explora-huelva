@@ -3,8 +3,15 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- 🚫 Evitar que el navegador muestre una versión antigua -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
     <!-- Controla el zoom y el ancho en móviles para diseño responsive -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>Explora Huelva</title>
 
     <!-- Descripción corta para SEO y previews en buscadores -->
@@ -34,7 +41,7 @@
     <!-- Contenedor raíz donde React montará la SPA -->
     <div id="root"></div>
 
-    <!-- Punto de entrada de Vite/React (carga el bundle en modo módulo ES) -->
+    <!-- Punto de entrada de Vite/React -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
