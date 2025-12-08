@@ -1,6 +1,6 @@
 // src/paginas/Contacto.jsx
 // Página de contacto 100% frontend usando FormSubmit
-// Envía directamente a: antoniojoseromeromendez@gmail.com
+// Envía directamente al correo asociado al token de FormSubmit
 
 import { useState } from "react";
 
@@ -24,7 +24,8 @@ export default function Contacto() {
     setOkMsg("");
     setErrMsg("");
 
-    // FormSubmit redirige automáticamente; animación local
+    // Esta parte es solo “feedback local”.
+    // Después de enviar, FormSubmit redirigirá a _next (tu propia web).
     setTimeout(() => {
       setOkMsg("Mensaje enviado correctamente. ¡Gracias por escribir! 😊");
       setNombre("");
@@ -81,7 +82,7 @@ export default function Contacto() {
                   <div className="mt-4 p-3 rounded text-center bg-white shadow-sm">
                     <i className="bi bi-send-fill text-primary fs-3"></i>
                     <p className="text-muted small mt-2 mb-0">
-                      Respondemos normalmente en 24–48 horas.  
+                      Respondemos normalmente en 24–48 horas.
                       ¡Gracias por confiar en Explora Huelva!
                     </p>
                   </div>
@@ -98,11 +99,16 @@ export default function Contacto() {
                     Este mensaje se enviará directamente a nuestro correo.
                   </p>
 
-                  {okMsg && <div className="alert alert-success py-2">{okMsg}</div>}
-                  {errMsg && <div className="alert alert-danger py-2">{errMsg}</div>}
+                  {okMsg && (
+                    <div className="alert alert-success py-2">{okMsg}</div>
+                  )}
+                  {errMsg && (
+                    <div className="alert alert-danger py-2">{errMsg}</div>
+                  )}
 
                   <form
-                    action="https://formsubmit.co/antoniojoseromeromendez@gmail.com"
+                    // 👉 Usamos el token de FormSubmit en lugar del email
+                    action="https://formsubmit.co/e398bc3dcfcb0891bdce69227afcb1b5"
                     method="POST"
                     onSubmit={enviar}
                   >
@@ -113,6 +119,12 @@ export default function Contacto() {
                       type="hidden"
                       name="_subject"
                       value="Nuevo mensaje desde Explora Huelva"
+                    />
+                    {/* 👉 Después de enviar, vuelve a tu propia página */}
+                    <input
+                      type="hidden"
+                      name="_next"
+                      value="https://explorahuelva.es/contacto"
                     />
 
                     <div className="mb-3">
@@ -163,7 +175,11 @@ export default function Contacto() {
                       />
                     </div>
 
-                    <button type="submit" className="btn btn-primary" disabled={enviando}>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={enviando}
+                    >
                       {enviando ? "Enviando..." : "Enviar mensaje"}
                     </button>
                   </form>
