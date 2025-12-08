@@ -81,28 +81,34 @@ const reglasCrear = [
     .trim()
     .isLength({ min: 1, max: 120 })
     .withMessage('El título es obligatorio y máx. 120 caracteres'),
+
   body('descripcion')
     .isString()
     .withMessage('Descripción inválida')
     .trim()
     .isLength({ min: 1, max: 1000 })
     .withMessage('La descripción es obligatoria y máx. 1000 caracteres'),
+
   body('visibilidad')
     .isIn(VISIBILIDADES_PERMITIDAS)
     .withMessage('Visibilidad inválida'),
+
   body('videoUrl')
     .optional({ checkFalsy: true })
     .custom((v) => !v || urlOk(v))
     .withMessage('URL de vídeo no válida'),
+
+  // ✅ AQUÍ ESTABA EL FALLO Y YA ESTÁ CORREGIDO
   body('etiquetas').custom((value) => {
     const arr = toArray(value);
     if (arr.length < 1) throw new Error('Selecciona al menos una etiqueta');
     const invalid = arr.filter(
-      (t) => !ETIQUIETAS_PERMITIDAS.includes(String(t).toLowerCase())
+      (t) => !ETIQUETAS_PERMITIDAS.includes(String(t).toLowerCase())
     );
     if (invalid.length) throw new Error('Alguna etiqueta no es válida');
     return true;
   }),
+
   body('imagenes').custom((value, { req }) => {
     // Pueden venir como URLs o como ficheros
     const urls = toArray(value).filter(Boolean);
@@ -117,6 +123,7 @@ const reglasCrear = [
     if (bad.length) throw new Error('Alguna imagen no es una URL válida');
     return true;
   }),
+
   ...reglasLatLng,
 ];
 
