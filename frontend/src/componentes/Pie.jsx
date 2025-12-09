@@ -403,7 +403,8 @@ export default function Pie() {
                   <i className="bi bi-google-play me-1" /> Google Play
                 </button>
 
-                {/* Descarga directa del APK de Android (opcional) */}
+                {/* 👇 AQUÍ ESTABA EL BOTÓN DEL APK, YA ELIMINADO 👇 */}
+                {/*
                 <a
                   href="/.explorahuelva.apk"
                   className="btn btn-outline-success btn-sm px-3"
@@ -412,6 +413,7 @@ export default function Pie() {
                   <i className="bi bi-android2 me-1" />
                   APK Android
                 </a>
+                */}
               </div>
             </div>
           </div>
