@@ -152,3 +152,52 @@ createRoot(document.getElementById("root")).render(
     </BrowserRouter>
   </React.StrictMode>
 );
+
+// Registrar / desregistrar Service Worker para PWA
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/service-worker.js")
+      .then((registration) => {
+        console.log("Service Worker registrado:", registration);
+
+        // Detectar nuevas versiones del SW
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          installingWorker?.addEventListener("statechange", () => {
+            if (installingWorker.state === "installed") {
+              if (navigator.serviceWorker.controller) {
+                // Mostrar banner para recargar
+                const banner = document.createElement("div");
+                banner.style.position = "fixed";
+                banner.style.bottom = "24px";
+                banner.style.left = "50%";
+                banner.style.transform = "translateX(-50%)";
+                banner.style.zIndex = "9999";
+                banner.style.background = "#0d6efd";
+                banner.style.color = "#fff";
+                banner.style.padding = "12px 18px";
+                banner.style.borderRadius = "8px";
+                banner.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
+                banner.style.fontSize = "14px";
+                banner.textContent =
+                  "Nueva versión de Explora Huelva disponible. Toca para actualizar.";
+                banner.style.cursor = "pointer";
+                banner.onclick = () => location.reload();
+                document.body.appendChild(banner);
+              }
+            }
+          });
+        };
+      })
+      .catch((err) => {
+        console.error("Error registrando el Service Worker:", err);
+      });
+  });
+} else if ("serviceWorker" in navigator && import.meta.env.DEV) {
+  // En desarrollo desregistramos cualquier SW para evitar caches raras
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((r) => r.unregister());
+    console.log("Service Worker desregistrado en desarrollo");
+  });
+}

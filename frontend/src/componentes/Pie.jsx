@@ -1,7 +1,7 @@
 // frontend/src/componentes/Pie.jsx
-// Pie de página con enlaces, redes, newsletter y modal informativo.
+// Pie de página con enlaces, redes, newsletter y soporte PWA (instalar app).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { newsletterApi } from "../servicios/newsletter";
 
@@ -11,11 +11,89 @@ export default function Pie() {
   const [okMsg, setOkMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
 
-  // Estado del modal "Próximamente"
+  // Estado del modal informativo sobre la app / PWA
   const [showModal, setShowModal] = useState(false);
 
   const abrirModal = () => setShowModal(true);
   const cerrarModal = () => setShowModal(false);
+
+  // --- Soporte PWA: botón "Instalar app" ---
+  const [eventoInstalar, setEventoInstalar] = useState(null);
+  const [mostrarBotonInstalar, setMostrarBotonInstalar] = useState(false);
+  const [esIOS, setEsIOS] = useState(false);
+
+  // ¿La app ya está instalada como PWA?
+  const estaInstalada = () => {
+    if (typeof window === "undefined") return false;
+
+    // Estándar
+    if (
+      window.matchMedia &&
+      window.matchMedia("(display-mode: standalone)").matches
+    ) {
+      return true;
+    }
+
+    // iOS antiguo
+    if (navigator.standalone) return true;
+
+    return false;
+  };
+
+  // Detectar dispositivo y capturar beforeinstallprompt (Android / Chrome)
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof navigator === "undefined") {
+      return;
+    }
+
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const ios = /iphone|ipad|ipod/i.test(ua);
+    setEsIOS(ios);
+
+    // Si ya está instalada, no mostramos botón
+    if (estaInstalada()) {
+      setMostrarBotonInstalar(false);
+      return;
+    }
+
+    // iOS nunca dispara beforeinstallprompt, pero queremos enseñar el botón
+    if (ios) {
+      setMostrarBotonInstalar(true);
+    }
+
+    const handler = (e) => {
+      // Android / navegadores compatibles
+      e.preventDefault();
+      setEventoInstalar(e);
+      setMostrarBotonInstalar(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  const instalarApp = async () => {
+    // iOS o navegadores sin evento: mostramos instrucciones en el modal
+    if (esIOS || !eventoInstalar) {
+      setShowModal(true);
+      return;
+    }
+
+    // Android / Chrome con beforeinstallprompt
+    eventoInstalar.prompt();
+    const { outcome } = await eventoInstalar.userChoice;
+
+    if (outcome === "accepted") {
+      console.log("Usuario aceptó instalar la PWA");
+      setMostrarBotonInstalar(false);
+      setEventoInstalar(null);
+    } else {
+      console.log("Usuario rechazó la instalación de la PWA");
+    }
+  };
 
   // Validación sencilla de email
   const esEmailValido = (valor) => {
@@ -83,7 +161,10 @@ export default function Pie() {
                 Comparte momentos y encuentra tu próxima aventura.
               </p>
 
-              <nav aria-label="Redes sociales" className="d-flex gap-2 flex-wrap">
+              <nav
+                aria-label="Redes sociales"
+                className="d-flex gap-2 flex-wrap"
+              >
                 {/* Instagram */}
                 <a
                   className="btn btn-outline-light btn-sm rounded-circle"
@@ -293,6 +374,19 @@ export default function Pie() {
               )}
 
               <div className="d-flex flex-wrap gap-2 mt-3">
+                {/* Botón principal para instalar la app (PWA) */}
+                {mostrarBotonInstalar && (
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm px-3"
+                    onClick={instalarApp}
+                  >
+                    <i className="bi bi-phone me-1" />
+                    Instalar app
+                  </button>
+                )}
+
+                {/* Botones informativos de tiendas (siguen abriendo el modal) */}
                 <button
                   type="button"
                   className="btn btn-outline-light btn-sm px-3"
@@ -309,14 +403,14 @@ export default function Pie() {
                   <i className="bi bi-google-play me-1" /> Google Play
                 </button>
 
-                {/* NUEVO: descarga directa del APK de Android */}
+                {/* Descarga directa del APK de Android (opcional) */}
                 <a
                   href="/.explorahuelva.apk"
-                  className="btn btn-success btn-sm px-3"
+                  className="btn btn-outline-success btn-sm px-3"
                   download
                 >
                   <i className="bi bi-android2 me-1" />
-                  Descargar APK Android
+                  APK Android
                 </a>
               </div>
             </div>
@@ -369,7 +463,7 @@ export default function Pie() {
         </div>
       </footer>
 
-      {/* Modal "Próximamente" para las apps móviles */}
+      {/* Modal informativo sobre la app / PWA */}
       {showModal && (
         <div
           className="modal fade show"
@@ -378,7 +472,7 @@ export default function Pie() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content bg-dark text-light">
               <div className="modal-header border-secondary">
-                <h5 className="modal-title">🚧 Disponible próximamente</h5>
+                <h5 className="modal-title">📱 Explora Huelva en tu móvil</h5>
                 <button
                   type="button"
                   className="btn-close btn-close-white"
@@ -388,15 +482,32 @@ export default function Pie() {
 
               <div className="modal-body text-center">
                 <p className="text-secondary mb-3">
-                  Las apps oficiales de <strong>Explora Huelva</strong> estarán
-                  disponibles muy pronto.
+                  <strong>Explora Huelva</strong> funciona como{" "}
+                  <strong>aplicación web progresiva (PWA)</strong>.
                 </p>
 
-                <i className="bi bi-phone display-4 text-primary"></i>
+                <p className="text-secondary mb-3">
+                  Para instalarla en tu dispositivo:
+                </p>
 
-                <p className="mt-3 small text-secondary mb-0">
-                  Podrás descargarlas en App Store y Google Play cuando las
-                  publiquemos.
+                <ul className="text-start small text-secondary mb-3">
+                  <li>
+                    En <strong>Android</strong>: pulsa el botón{" "}
+                    <strong>&quot;Instalar app&quot;</strong> cuando lo veas en
+                    la parte inferior o usa el menú del navegador →
+                    &quot;Añadir a pantalla de inicio&quot;.
+                  </li>
+                  <li>
+                    En <strong>iPhone / iPad</strong>: abre la web en Safari,
+                    pulsa el botón <strong>Compartir</strong> y elige{" "}
+                    <strong>&quot;Añadir a pantalla de inicio&quot;</strong>.
+                  </li>
+                </ul>
+
+                <p className="small text-secondary mb-0">
+                  Una vez instalada, podrás abrir <strong>Explora Huelva</strong>{" "}
+                  como si fuera una app más, con su icono en la pantalla de
+                  inicio.
                 </p>
               </div>
 
