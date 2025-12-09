@@ -1,22 +1,16 @@
-{
-  auto_https off
-}
-
-:80 {
+explorahuelva.es {
   encode gzip
 
-  @api path /api/* /uploads/*
+  @api path /api/*
+
+  # Rutas de API -> contenedor api:5174
   handle @api {
     reverse_proxy api:5174
   }
 
+  # Todo lo demás -> contenedor web:80 (build de React)
   handle {
     reverse_proxy web:80
   }
-
-  log {
-    output stdout
-    format console
-    level INFO
-  }
 }
+
